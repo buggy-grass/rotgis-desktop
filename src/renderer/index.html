@@ -6,6 +6,148 @@
   <title>RotGIS Desktop</title>
 </head>
 <body>
+  <script>if (typeof module === 'object') { window.module = module; module = undefined; }</script>
+
+  <script type="module">
+    const path = require('path');
+    let env = 'development';
+    let mainPath = path.join(__dirname, '..', '..', '..', '..', '..', '..', 'libs', 'potree');
+    if (__dirname.includes('app.asar')) {
+      mainPath = path.join(__dirname, '..', '..', '..', '..', 'libs', 'potree');
+    }
+
+    // css
+    const spectrumCSSPath = path.join(mainPath, 'css', 'spectrum.css');
+    const potreeCSSPath = path.join(mainPath, 'css', 'potree.css');
+    const jstreeCSSPath = path.join(mainPath, 'css', 'jstree.css');
+    const jqueryUICSSPath = path.join(mainPath, 'css', 'jquery-ui.min.css');
+
+    // spectrum CSS
+    const cssSpectrum = document.createElement('link');
+    cssSpectrum.href = `file://${spectrumCSSPath}`;
+    cssSpectrum.rel = 'stylesheet';
+    cssSpectrum.type = 'text/css';
+    document.head.appendChild(cssSpectrum);
+    // potree CSS
+    const cssPotree = document.createElement('link');
+    cssPotree.href = `file://${potreeCSSPath}`;
+    cssPotree.rel = 'stylesheet';
+    cssPotree.type = 'text/css';
+    document.head.appendChild(cssPotree);
+    // jstree CSS
+    const cssJstree = document.createElement('link');
+    cssJstree.href = `file://${jstreeCSSPath}`;
+    cssJstree.rel = 'stylesheet';
+    cssJstree.type = 'text/css';
+    document.head.appendChild(cssJstree);
+    // jquery-ui CSS
+    const cssJqueryUI = document.createElement('link');
+    cssJqueryUI.href = `file://${jqueryUICSSPath}`;
+    cssJqueryUI.rel = 'stylesheet';
+    cssJqueryUI.type = 'text/css';
+    document.head.appendChild(cssJqueryUI);
+
+    // JS
+    const jqueryPath = path.join(mainPath, 'jquery-3.1.1.js');
+    const spectrumPath = path.join(mainPath, 'spectrum.js');
+    const jqueryUIPath = path.join(mainPath, 'jquery-ui.min.js');
+    const binaryHeapPath = path.join(mainPath, 'BinaryHeap.js');
+    const tweenPath = path.join(mainPath, 'tween.min.js');
+    const d3Path = path.join(mainPath, 'd3.min.js');
+    const proj4Path = path.join(mainPath, 'proj4.js');
+
+    const i18nextPath = path.join(mainPath, 'i18next.js');
+    const jstreePath = path.join(mainPath, 'jstree.js');
+    const potreePath = path.join(mainPath, 'potree.js');
+    const laslazPath = path.join(mainPath, 'laslaz.js');
+    const threejsPath = path.join(mainPath, 'three.js');
+    const objLoaderPath = path.join(mainPath, 'loaders', 'OBJLoader.js');
+    const mtlLoaderPath = path.join(mainPath, 'loaders', 'MTLLoader.js');
+    const objExporterPath = path.join(mainPath, 'exporter', 'OBJExporter.js');
+    const statsJS = path.join(mainPath, 'stats', 'stats.js');
+
+    // jQuery - önce yükle (jstree için gerekli)
+    window.jquery = window.jQuery = window.$ = require(jqueryPath);
+    console.log('jQuery loaded:', typeof window.$ !== 'undefined');
+
+    // i18next
+    window.i18n = require(i18nextPath);
+
+    // Script yükleme helper - Promise ile sıralı yükleme
+    const loadScript = (src) => {
+      return new Promise((resolve, reject) => {
+        // Eğer script zaten yüklenmişse
+        if (document.querySelector(`script[src="${src}"]`)) {
+          resolve(src);
+          return;
+        }
+        
+        const script = document.createElement('script');
+        script.src = `file://${src}`;
+        script.onload = () => {
+          console.log('Loaded:', src);
+          resolve(src);
+        };
+        script.onerror = () => {
+          console.error('Failed to load:', src);
+          reject(new Error(`Failed to load script: ${src}`));
+        };
+        document.body.appendChild(script);
+      });
+    };
+
+    // Script'leri doğru sırayla yükle
+    // 1. jQuery (zaten yüklendi)
+    Promise.resolve()
+      // 2. jQuery UI (jstree için gerekli)
+      .then(() => {
+        console.log('Loading jQuery UI...');
+        return loadScript(jqueryUIPath);
+      })
+      // 3. jstree (jQuery ve jQuery UI'den sonra)
+      .then(() => {
+        console.log('Loading jstree...');
+        // jQuery'nin hazır olduğundan emin ol
+        if (typeof window.$ === 'undefined') {
+          throw new Error('jQuery is not loaded');
+        }
+        return loadScript(jstreePath);
+      })
+      // 4. Diğer bağımlılıklar (paralel yükle)
+      .then(() => {
+        console.log('Loading other dependencies...');
+        return Promise.all([
+          loadScript(spectrumPath),
+          loadScript(binaryHeapPath),
+          loadScript(tweenPath),
+          loadScript(d3Path),
+          loadScript(proj4Path)
+        ]);
+      })
+      // 5. Potree (tüm bağımlılıklardan sonra)
+      .then(() => {
+        console.log('Loading Potree...');
+        return loadScript(potreePath);
+      })
+      // 6. LasLaz (Potree'den sonra)
+      .then(() => {
+        console.log('Loading LasLaz...');
+        return loadScript(laslazPath);
+      })
+      .then(() => {
+        console.log('✅ All Potree dependencies loaded successfully!');
+        // Potree'nin yüklendiğini kontrol et
+        if (typeof window.Potree !== 'undefined') {
+          console.log('✅ Potree is available:', window.Potree);
+        } else {
+          console.warn('⚠️ Potree not found in window.Potree');
+        }
+      })
+      .catch((error) => {
+        console.error('❌ Error loading Potree dependencies:', error);
+      });
+
+  </script>
   <div id="root"></div>
 </body>
 </html>
