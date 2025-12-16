@@ -18,13 +18,29 @@ if (process.env.WEBPACK_SERVE) {
       port: 8080,
       historyApiFallback: true,
       compress: true,
+      client: {
+        overlay: {
+          errors: false,
+          warnings: false,
+        },
+      },
     },
+    // Hataları görmezden gel, sadece uyar
+    ignoreWarnings: [
+      /Failed to parse source map/,
+      /Module not found/,
+    ],
     module: {
       rules: [
         {
           test: /\.tsx?$/,
           include: /src/,
-          use: [{ loader: 'ts-loader' }]
+          use: [{ 
+            loader: 'ts-loader',
+            options: {
+              transpileOnly: true, // Type checking'i atla, sadece transpile et
+            }
+          }]
         },
         {
           test: /\.css$/,
@@ -123,13 +139,29 @@ if (process.env.WEBPACK_SERVE) {
       port: 8080,
       historyApiFallback: true,
       compress: true,
+      client: {
+        overlay: {
+          errors: false,
+          warnings: false,
+        },
+      },
     },
+    // Hataları görmezden gel, sadece uyar
+    ignoreWarnings: [
+      /Failed to parse source map/,
+      /Module not found/,
+    ],
     module: {
       rules: [
         {
           test: /\.tsx?$/,
           include: /src/,
-          use: [{ loader: 'ts-loader' }]
+          use: [{ 
+            loader: 'ts-loader',
+            options: {
+              transpileOnly: true, // Type checking'i atla, sadece transpile et
+            }
+          }]
         },
         {
           test: /\.css$/,

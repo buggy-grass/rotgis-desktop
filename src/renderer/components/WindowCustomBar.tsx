@@ -1,10 +1,16 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Minus, Square, X, Maximize2 } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import { Minus, Square, X, TabletSmartphone } from 'lucide-react';
 import { Button } from './ui/button';
+import { RootState } from '../store/store';
 
 export function WindowCustomBar() {
   const [isMaximized, setIsMaximized] = useState(false);
   const [electronAPIReady, setElectronAPIReady] = useState(false);
+  
+  // Store'dan veri al
+  const appName = useSelector((state: RootState) => state.appReducer.appName);
+  const projectName = useSelector((state: RootState) => state.appReducer.projectName);
 
   // Electron API'nin hazır olmasını bekle
   useEffect(() => {
@@ -102,12 +108,12 @@ export function WindowCustomBar() {
     <div className="h-8 bg-background border-b border-border flex items-center justify-between select-none drag-region">
       {/* Sol taraf - Uygulama ismi */}
       <div className="flex items-center gap-2 px-4 no-drag">
-        <span className="text-xs font-medium text-foreground">{'RotGIS Desktop'}</span>
+        <span className="text-xs font-medium text-foreground">{appName}</span>
       </div>
 
       {/* Orta - Proje ismi (drag region) */}
       <div className="flex-1 flex items-center justify-center drag-region">
-        <span className="text-xs font-semibold text-foreground pointer-events-none">Untitled Project*</span>
+        <span className="text-xs font-semibold text-foreground pointer-events-none">{projectName}</span>
       </div>
 
       {/* Sağ taraf - Window kontrol butonları */}
@@ -127,9 +133,9 @@ export function WindowCustomBar() {
           onClick={handleMaximize}
         >
           {isMaximized ? (
-            <Square className="h-3.5 w-3.5" />
+            <TabletSmartphone className="h-4 w-4" />
           ) : (
-            <Maximize2 className="h-4 w-4" />
+            <Square className="h-3.5 w-3.5" />
           )}
         </Button>
         <Button

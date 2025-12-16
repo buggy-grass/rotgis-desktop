@@ -9,6 +9,8 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    minWidth: 500,
+    minHeight: 400,
     frame: false, // Custom window bar için frame'i kaldır
     webPreferences: {
       nodeIntegration: true, // Webpack-dev-server için gerekli
