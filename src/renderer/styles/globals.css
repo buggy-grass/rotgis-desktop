@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Ana arka plan: #141414 */
+    --background: 0 0% 7.8%;
+    /* Metin rengi: Açık gri */
+    --foreground: 0 0% 90%;
+    /* Card arka plan: Biraz daha açık #1a1a1a */
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 90%;
+    /* Popover: Card ile aynı */
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 90%;
+    /* Primary: Orta gri ton #3b3b3b */
+    --primary: 0 0% 23%;
+    --primary-foreground: 0 0% 95%;
+    /* Secondary: Koyu gri #262626 */
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 90%;
+    /* Muted: Orta gri #2a2a2a */
+    --muted: 0 0% 16.5%;
+    --muted-foreground: 0 0% 65%;
+    /* Accent: Biraz daha açık gri #333333 */
+    --accent: 0 0% 20%;
+    --accent-foreground: 0 0% 90%;
+    /* Destructive: Kırmızı ton */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    /* Border: Orta gri #2a2a2a */
+    --border: 0 0% 16.5%;
+    /* Input: Biraz daha açık #404040 */
+    --input: 0 0% 25%;
+    /* Ring: Daha açık gri #525252 */
+    --ring: 0 0% 32%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
