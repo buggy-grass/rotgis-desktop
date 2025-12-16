@@ -12,6 +12,10 @@ export interface ElectronAPI {
 declare global {
   interface Window {
     electronAPI: ElectronAPI;
+    viewer: any;
+    Potree: any;
+    pointSizeType: number;
+    eventBus: any;
   }
 }
 
