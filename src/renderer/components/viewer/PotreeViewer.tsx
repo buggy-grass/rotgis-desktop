@@ -4,6 +4,9 @@ import StatusBarActions from "../../store/actions/StatusBarActions";
 import PotreeService from "../../services/PotreeService";
 import PotreeBackgroundService from "../../services/PotreeBackgroundService";
 import FPSMeter from "../FPSMeter";
+import Compass from "../Compass";
+import OrbitController from "../OrbitController";
+import "../../services/EventEmitter";
 
 const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const potreeRenderAreaRef = React.useRef<HTMLDivElement>(null);
@@ -215,10 +218,58 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
           window.viewer.setControls(window.viewer.earthControls);
 
           window.viewer.zoomTo(e.pointcloud, 1.2);
+          
+          // Camera rotation tracking'i başlat
+          setupCameraRotationTracking(window.viewer);
 
         //   PotreeService.zoomToBBox("pc");
         });
     };
+
+  // Camera rotation değişikliğini takip et ve EventEmitter ile ilet
+  const setupCameraRotationTracking = (viewer: any) => {
+    if (!viewer || !viewer.scene) return;
+    
+    let lastYaw: number | null = null;
+    const THRESHOLD = 0.01; // 0.01 radyan (~0.57 derece) eşik değeri - performans için
+    
+    const checkRotationChange = () => {
+      try {
+        if (!viewer.scene || !viewer.scene.view) return;
+        
+        const view = viewer.scene.view;
+        if (typeof view.yaw !== 'undefined') {
+          // Sadece belirli bir eşik değerinden fazla değiştiyse emit et
+          if (lastYaw === null || Math.abs(view.yaw - lastYaw) > THRESHOLD) {
+            lastYaw = view.yaw;
+            
+            // Yaw'ı dereceye çevir (0-360 arası)
+            let yawDegrees = (view.yaw * 180) / Math.PI;
+            yawDegrees = yawDegrees % 360;
+            if (yawDegrees < 0) yawDegrees += 360;
+            
+            // Pitch'i dereceye çevir
+            const pitchDegrees = typeof view.pitch !== 'undefined' 
+              ? (view.pitch * 180) / Math.PI 
+              : 0;
+            
+            // EventEmitter'a emit et (hem yaw hem pitch)
+            if (window.eventBus) {
+              window.eventBus.emit('camera-rotation-changed', { 
+                yaw: yawDegrees,
+                pitch: pitchDegrees,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        // Hata durumunda sessizce devam et
+      }
+    };
+    
+    // Potree'nin update event'ini dinle
+    viewer.addEventListener('update', checkRotationChange);
+  };
 
   const potreeOnMouseMove = async (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isMouseWheelHeld && !isObjectMoving) {
@@ -264,9 +315,27 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
           right: "10px",
           zIndex: 10000,
           pointerEvents: "none",
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px",
+          alignItems: "flex-end",
         }}
       >
+        <Compass className="pointer-events-auto" />
         <FPSMeter className="pointer-events-auto" />
+      </div>
+      
+      {/* Orbit Controller - Sol alt köşe */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "10px",
+          left: "10px",
+          zIndex: 10000,
+          pointerEvents: "auto",
+        }}
+      >
+        <OrbitController />
       </div>
       
       <div
@@ -301,7 +370,6 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
             height: "100%",
           }}
         >
-          {" "}
         </div>
       </div>
     </div>

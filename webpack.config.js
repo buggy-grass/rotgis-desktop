@@ -53,6 +53,10 @@ if (process.env.WEBPACK_SERVE) {
             'css-loader',
             'postcss-loader'
           ]
+        },
+        {
+          test: /\.json$/,
+          type: 'json'
         }
       ]
     },
@@ -198,6 +202,10 @@ if (process.env.WEBPACK_SERVE) {
             'css-loader',
             'postcss-loader'
           ]
+        },
+        {
+          test: /\.json$/,
+          type: 'json'
         }
       ]
     },
