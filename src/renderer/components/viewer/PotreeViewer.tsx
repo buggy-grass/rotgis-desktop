@@ -2,6 +2,8 @@ import React, { useEffect } from "react";
 import PointCloudService from "../../services/PointCloudService";
 import StatusBarActions from "../../store/actions/StatusBarActions";
 import PotreeService from "../../services/PotreeService";
+import PotreeBackgroundService from "../../services/PotreeBackgroundService";
+import FPSMeter from "../FPSMeter";
 
 const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const potreeRenderAreaRef = React.useRef<HTMLDivElement>(null);
@@ -147,6 +149,8 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       };
       window.pointSizeType = 1;
       window.viewer = new window.Potree.Viewer(elRenderArea, viewerArgs);
+      
+
     //   window.viewer.renderer.setClearColor(0x1f1f1f, 1);
       // window.viewer.setEDLEnabled(true);
       // window.viewer.setFOV(60);
@@ -178,7 +182,14 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
           );
         }
 
+        // Gradient-grid background modunu ekle
+        PotreeBackgroundService.setupGradientGridBackground(window.viewer);
+
         loadPointCloud("C:\\Users\\bugra.cimen\\Desktop\\rotgis-desktop\\test_data\\metadata.json", "pc");
+        window.viewer.renderer.setClearColor(0x1f1f1f, 1);
+        // Gradient-grid background'u aktif et
+        window.viewer.setBackground("gradient-grid");
+      
       });
     } catch (error) {
       console.error(error);
@@ -209,69 +220,55 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         });
     };
 
-  const potreeOnMouseMove = async (event: any) => {
+  const potreeOnMouseMove = async (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isMouseWheelHeld && !isObjectMoving) {
-      let debounceTimeout: any;
-      const DEBOUNCE_DELAY = 1;
-      //   switch (activeModel.type) {
-      //     case "mesh": {
-      //       if (!debounceTimeout) {
-      //         // Set a new timeout to call the mouseCoordListener after the delay
-      //         debounceTimeout = setTimeout(async () => {
-      //           const resultMesh = await MeshModelManager.mouseCoordListener(
-      //             event
-      //           );
+      if (window.viewer && window.viewer.scene && window.viewer.scene.pointclouds) {
+        const pointCloudsArray = window.viewer.scene.pointclouds;
+        
+        // Point cloud kontrolü - eğer pointclouds boşsa işlemi sonlandır
+        if (!pointCloudsArray || pointCloudsArray.length === 0) {
+          StatusBarActions.clearCoords();
+          return;
+        }
 
-      //           if (resultMesh.point.position.x == -1) {
-      //             StatusBarActions.clearCoords();
-      //             return;
-      //           }
-
-      //           StatusBarActions.updateProjectCoords(
-      //             resultMesh.point.position.x.toFixed(2) +
-      //               " , " +
-      //               resultMesh.point.position.y.toFixed(2) +
-      //               " , " +
-      //               resultMesh.point.position.z.toFixed(2)
-      //           );
-
-      //           // Clear the previous timeout if a new mouse move is detected before the delay
-      //           clearTimeout(debounceTimeout);
-      //           debounceTimeout = null;
-      //         }, DEBOUNCE_DELAY);
-      //       }
-      //       break;
-      //     }
-      //     case "pc": {
-      if (window.viewer) {
-        // debounceTimeout = setTimeout(async () => {
-          const pointClouds = window.viewer.scene.pointclouds[0];
-          const resultPc = await PointCloudService.mouseCoordListener(
-            event,
-            pointClouds
-          );
-          console.error(resultPc.point.position);
-          if (resultPc.point.position.x == -1) {
-            StatusBarActions.clearCoords();
-            return;
-          }
-          StatusBarActions.setCoordinates(
-            Number(resultPc.point.position.x.toFixed(2)),
-            Number(resultPc.point.position.y.toFixed(2)),
-            Number(resultPc.point.position.z.toFixed(2))
-          );
-
-        //   clearTimeout(debounceTimeout);
-        //   debounceTimeout = null;
-        // }, DEBOUNCE_DELAY);
-        // break;
+        // Native event'i kullanarak daha hassas koordinat hesaplama
+        const nativeEvent = event.nativeEvent;
+        
+        // getMousePointCloudIntersection bir array bekliyor, bu yüzden tüm pointclouds array'ini gönderiyoruz
+        const resultPc = await PointCloudService.mouseCoordListener(
+          nativeEvent,
+          pointCloudsArray
+        );
+        
+        if (resultPc.point.position.x == -1) {
+          StatusBarActions.clearCoords();
+          return;
+        }
+        
+        // Daha hassas koordinat gösterimi (3 ondalık basamak)
+        StatusBarActions.setCoordinates(
+          Number(resultPc.point.position.x.toFixed(3)),
+          Number(resultPc.point.position.y.toFixed(3)),
+          Number(resultPc.point.position.z.toFixed(3))
+        );
       }
-      //     }
-      //   }
     }
   };
   return (
-    <div id="viewerContainer">
+    <div id="viewerContainer" style={{display:"flex", margin:0, padding:0, width:"100%", height:"100%", position: "relative"}}>
+      {/* 3D FPS Meter - Sağ üst köşe */}
+      <div
+        style={{
+          position: "absolute",
+          top: "10px",
+          right: "10px",
+          zIndex: 10000,
+          pointerEvents: "none",
+        }}
+      >
+        <FPSMeter className="pointer-events-auto" />
+      </div>
+      
       <div
         id="potree_container"
         style={{

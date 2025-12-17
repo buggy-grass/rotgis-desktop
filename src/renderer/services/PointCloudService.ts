@@ -103,24 +103,87 @@ class PointCloudService {
   }
 
   static async getMouseCoordinates(e: any, projects: any) {
-    const elem = document.getElementById("potree_container");
-    const offset = elem?.getBoundingClientRect();
-    const x_diff = offset?.left;
-    const y_diff = offset?.top;
+    // Projects kontrolü - eğer projects null veya undefined ise null döndür
+    if (!projects || !window.viewer || !window.viewer.scene) {
+      return null;
+    }
 
-    if (x_diff && y_diff) {
+    // Canvas element'ini direkt kullanarak daha hassas koordinat hesaplama
+    // Potree viewer'ın renderer'ındaki canvas'ı kullan
+    const canvas = window.viewer.renderer?.domElement;
+    if (!canvas) {
+      // Fallback: potree_render_area kullan
+      const renderArea = document.getElementById("potree_render_area");
+      if (!renderArea) {
+        return null;
+      }
+      const rect = renderArea.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) {
+        return null;
+      }
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      // Koordinatların render area içinde olup olmadığını kontrol et
+      if (mouseX < 0 || mouseY < 0 || mouseX > rect.width || mouseY > rect.height) {
+        return null;
+      }
+
+      try {
+        const intersection =
+          await window.Potree.Utils.getMousePointCloudIntersection(
+            { x: mouseX, y: mouseY },
+            window.viewer.scene.getActiveCamera(),
+            window.viewer,
+            projects
+          );
+        return intersection;
+      } catch (error) {
+        console.error("Error calculating mouse coordinates:", error);
+        return null;
+      }
+    }
+
+    // Canvas'ın bounding rect'ini al
+    const rect = canvas.getBoundingClientRect();
+    
+    // rect geçerli mi kontrol et (width ve height 0'dan büyük olmalı)
+    if (!rect || rect.width <= 0 || rect.height <= 0) {
+      return null;
+    }
+
+    // Daha hassas koordinat hesaplama
+    // clientX/Y direkt mouse pozisyonunu verir (viewport koordinatları)
+    // rect.left/top ise canvas'ın viewport'taki pozisyonunu verir
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Koordinatların canvas içinde olup olmadığını kontrol et
+    // Küçük bir tolerance ekleyerek border'larda da çalışmasını sağla
+    const tolerance = 1;
+    if (mouseX < -tolerance || mouseY < -tolerance || 
+        mouseX > rect.width + tolerance || mouseY > rect.height + tolerance) {
+      return null;
+    }
+
+    // Canvas'ın içindeki koordinatları clamp et
+    const clampedX = Math.max(0, Math.min(rect.width, mouseX));
+    const clampedY = Math.max(0, Math.min(rect.height, mouseY));
+
+    try {
       const intersection =
         await window.Potree.Utils.getMousePointCloudIntersection(
-          { x: e.clientX - x_diff, y: e.clientY - y_diff },
+          { x: clampedX, y: clampedY },
           window.viewer.scene.getActiveCamera(),
           window.viewer,
           projects
         );
 
       return intersection;
+    } catch (error) {
+      console.error("Error calculating mouse coordinates:", error);
+      return null;
     }
-
-    return null;
   }
 }
 

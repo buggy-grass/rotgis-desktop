@@ -72144,6 +72144,8 @@ void main() {
 				renderer.render(viewer.skybox.scene, viewer.skybox.camera);
 			}else if(viewer.background === "gradient"){
 				renderer.render(viewer.scene.sceneBG, viewer.scene.cameraBG);
+			}else if(viewer.background === "gradient-grid"){
+				renderer.render(viewer.scene.sceneBG, viewer.scene.cameraBG);
 			}
 			
 			for(let pointcloud of this.viewer.scene.pointclouds){
@@ -72318,6 +72320,8 @@ void main() {
 				renderer.setClearColor(0x000000, 0);
 			} else if (background === 'gradient') {
 				renderer.setClearColor(0x000000, 0);
+			} else if (background === 'gradient-grid') {
+				renderer.setClearColor(0x000000, 0);
 			} else if (background === 'black') {
 				renderer.setClearColor(0x000000, 1);
 			} else if (background === 'white') {
@@ -72408,6 +72412,8 @@ void main() {
 				viewer.skybox.camera.updateProjectionMatrix();
 				viewer.renderer.render(viewer.skybox.scene, viewer.skybox.camera);
 			} else if (viewer.background === 'gradient') {
+				viewer.renderer.render(viewer.scene.sceneBG, viewer.scene.cameraBG);
+			} else if (viewer.background === 'gradient-grid') {
 				viewer.renderer.render(viewer.scene.sceneBG, viewer.scene.cameraBG);
 			} 
 
@@ -72605,6 +72611,8 @@ void main() {
 				renderer.setClearColor(0x000000, 0);
 			} else if (background === 'gradient') {
 				renderer.setClearColor(0x000000, 0);
+			} else if (background === 'gradient-grid') {
+				renderer.setClearColor(0x000000, 0);
 			} else if (background === 'black') {
 				renderer.setClearColor(0x000000, 1);
 			} else if (background === 'white') {
@@ -72784,6 +72792,10 @@ void main() {
 				viewer.skybox.camera.updateProjectionMatrix();
 				viewer.renderer.render(viewer.skybox.scene, viewer.skybox.camera);
 			} else if (viewer.background === 'gradient') {
+				viewer.renderer.setClearColor(0x000000, 0);
+				viewer.renderer.clear();
+				viewer.renderer.render(viewer.scene.sceneBG, viewer.scene.cameraBG);
+			} else if (viewer.background === 'gradient-grid') {
 				viewer.renderer.setClearColor(0x000000, 0);
 				viewer.renderer.clear();
 				viewer.renderer.render(viewer.scene.sceneBG, viewer.scene.cameraBG);
@@ -90441,7 +90453,7 @@ ENDSEC
 			}
 
 			if(bg === "skybox"){
-				this.skybox = Utils.loadSkybox(new URL(Potree.resourcePath + '/textures/skybox2/').href);
+				this.skybox = Utils.loadSkybox(new URL(Potree.resourcePath + '/textures/skybox/').href);
 			}
 
 			this.background = bg;

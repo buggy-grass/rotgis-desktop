@@ -48,7 +48,7 @@ const App = memo(function App() {
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <WindowCustomBar />
       <div style={{ height: "calc(100vh - 52px)", width: "100vw", position: "relative" }}>
-        <Button onClick={() => setViewer(true)}>Open Viewer</Button>
+        <Button style={{position:"absolute"}} onClick={() => setViewer(true)}>Open Viewer</Button>
         {viewer && <PotreeViewer display="block" />}
         {<HeightProfileViewer display="none" />}
       </div>

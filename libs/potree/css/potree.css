@@ -167,7 +167,7 @@
 
 #potree_render_area{
 	position: 	absolute;
-	background: "#1f1f1f";
+	/* background: "#1f1f1f"; */
 	top: 		0px;
 	bottom: 	0px;
 	left: 		0px;
