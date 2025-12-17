@@ -1,12 +1,11 @@
-import { memo, useMemo, useCallback, useEffect, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { Button } from './components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
-import { Divider } from './components/ui/divider';
 import { WindowCustomBar } from './components/WindowCustomBar';
-import { Moon, Sun, Zap } from 'lucide-react';
 import "./services/EventEmitter";
 import PotreeViewer from './components/viewer/PotreeViewer';
 import React from 'react';
+import HeightProfileViewer from './components/viewer/HeightProfileViewer';
+import StatusBar from './components/StatusBar';
 
 // Potree için performans optimizasyonları
 const App = memo(function App() {
@@ -45,17 +44,15 @@ const App = memo(function App() {
     return cleanup;
   }, []);
 
-  // Callback memoization - event handler'lar için
-  const handleButtonClick = useCallback((variant: string) => {
-    console.log(`Button clicked: ${variant}`);
-  }, []);
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <WindowCustomBar />
-      <div className="flex-1 container mx-auto p-8 overflow-auto">
+      <div style={{ height: "calc(100vh - 52px)", width: "100vw", position: "relative" }}>
         <Button onClick={() => setViewer(true)}>Open Viewer</Button>
         {viewer && <PotreeViewer display="block" />}
+        {<HeightProfileViewer display="none" />}
       </div>
+      <StatusBar />
     </div>
   );
 });

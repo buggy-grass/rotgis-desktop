@@ -90229,7 +90229,7 @@ ENDSEC
 				this.setShowBoundingBox(false);
 				this.setFreeze(false);
 				this.setControls(this.orbitControls);
-				this.setBackground('gradient');
+				this.setBackground('solid');
 				this.setDescription("");
 				this.scaleFactor = 1;
 
@@ -91415,7 +91415,7 @@ ENDSEC
 			// };
 
 			let canvas = document.createElement("canvas");
-			canvas.setAttribute("id", "dronet-viewer-canvas");
+			canvas.setAttribute("id", "rotgis-canvas");
 
 			let context = canvas.getContext('webgl', contextAttributes );
 

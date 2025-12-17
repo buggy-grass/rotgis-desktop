@@ -99,6 +99,10 @@
     // Script'leri doğru sırayla yükle
     // 1. jQuery (zaten yüklendi)
     Promise.resolve()
+    .then(() => {
+        console.log('Loading jQuery UI...');
+        return loadScript(threejsPath);
+      })
       // 2. jQuery UI (jstree için gerekli)
       .then(() => {
         console.log('Loading jQuery UI...');

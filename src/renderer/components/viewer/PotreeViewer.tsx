@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import PointCloudService from "../../services/PointCloudService";
 import StatusBarActions from "../../store/actions/StatusBarActions";
+import PotreeService from "../../services/PotreeService";
 
 const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const potreeRenderAreaRef = React.useRef<HTMLDivElement>(null);
@@ -9,8 +10,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const [isObjectMoving, setIsObjectMoving] = React.useState(false);
   const webGLContextLost = React.useRef(false);
 
-
-    const handleContextLost = async (event: Event) => {
+  const handleContextLost = async (event: Event) => {
     event.preventDefault(); // 🔴 En önemli satır bu
     // console.warn("WebGL context LOST");
 
@@ -30,7 +30,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
 
   const clear = async () => {
     await PointCloudService.removePointClouds();
-  }
+  };
 
   const handleContextRestored = async () => {
     // console.log("WebGL context RESTORED");
@@ -49,13 +49,13 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       }
       potreeRenderAreaRef.current.innerHTML = "";
 
-    //   setOrbitControllerKey((prev) => prev + 1);
+      //   setOrbitControllerKey((prev) => prev + 1);
       await loadViewer();
-    //   ToolsActions.firstLoad(true);
-    //   LeftMenuActions.setSelectedMenu("");
-    //   setTimeout(() => {
-    //     LeftMenuActions.setSelectedMenu("3d");
-    //   }, 10);
+      //   ToolsActions.firstLoad(true);
+      //   LeftMenuActions.setSelectedMenu("");
+      //   setTimeout(() => {
+      //     LeftMenuActions.setSelectedMenu("3d");
+      //   }, 10);
     }
   };
 
@@ -80,7 +80,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       clear();
       window.viewer?.renderer?.dispose();
       window.viewer?.scene?.scene?.dispose();
-      const oldCanvas = window.viewer.renderer?.domElement;
+      const oldCanvas = window.viewer?.renderer?.domElement;
       oldCanvas?.remove();
     };
   }, []);
@@ -114,18 +114,40 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     }
   }, [display]);
 
-    const loadViewer = async () => {
+  const loadViewer = async () => {
     try {
       if (window.viewer) {
         window.viewer = null;
       }
       const elRenderArea = document.getElementById("potree_render_area");
+
+      // Sidebar container'ın DOM'da olduğundan emin ol
+      const waitForSidebarContainer = (): Promise<void> => {
+        return new Promise((resolve) => {
+          const checkSidebar = () => {
+            const sidebarContainer = document.getElementById(
+              "potree_sidebar_container"
+            );
+            if (sidebarContainer) {
+              resolve();
+            } else {
+              // Eğer container yoksa, bir sonraki render cycle'da tekrar kontrol et
+              requestAnimationFrame(checkSidebar);
+            }
+          };
+          checkSidebar();
+        });
+      };
+
+      await waitForSidebarContainer();
+
       const viewerArgs = {
         noDragAndDrop: true,
         useDefaultRenderLoop: false,
       };
       window.pointSizeType = 1;
       window.viewer = new window.Potree.Viewer(elRenderArea, viewerArgs);
+    //   window.viewer.renderer.setClearColor(0x1f1f1f, 1);
       // window.viewer.setEDLEnabled(true);
       // window.viewer.setFOV(60);
       // window.viewer.setPointBudget(5 * 1000 * 1000);
@@ -144,8 +166,8 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         }
         // window.viewer?.addEventListener("update", CadGeneralManager.update);
 
-        const dronetCanvas = document.getElementById("dronet-viewer-canvas");
-        canvasRef.current = dronetCanvas ? dronetCanvas : null;
+        const rotgisCanvas = document.getElementById("rotgis-canvas");
+        canvasRef.current = rotgisCanvas ? rotgisCanvas : null;
         const canvas = canvasRef.current;
         if (canvas) {
           canvas.addEventListener("webglcontextlost", handleContextLost, false);
@@ -155,12 +177,37 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
             false
           );
         }
+
+        loadPointCloud("C:\\Users\\bugra.cimen\\Desktop\\rotgis-desktop\\test_data\\metadata.json", "pc");
       });
     } catch (error) {
       console.error(error);
       return;
     }
   };
+
+  const loadPointCloud = (pointCloudPath: string, id: string) => {
+      window.Potree.loadPointCloud(pointCloudPath, id, (e: any) => {
+          window.viewer.scene.addPointCloud(e.pointcloud);
+          //e.pointcloud.position.z = 0;
+          const material = e.pointcloud.material;
+          material.size = 1;
+          // material.pointSizeType = window.Potree.PointSizeType.ATTENUATED;
+          // material.pointSizeType = window.Potree.PointSizeType.ADAPTIVE;
+        //   material.heightMin = pointCloud.properties.bbox.min.z;
+        //   material.heightMax = pointCloud.properties.bbox.max.z;
+          material.pointSizeType = window.pointSizeType;
+          //PointCloudManager.setPointBudget(5000000);
+          PotreeService.setNodeSize(30);
+          material.coloringType = 0;
+          material.gradientValue = "SPECTRAL";
+          window.viewer.setControls(window.viewer.earthControls);
+
+          window.viewer.zoomTo(e.pointcloud, 1.2);
+
+        //   PotreeService.zoomToBBox("pc");
+        });
+    };
 
   const potreeOnMouseMove = async (event: any) => {
     if (!isMouseWheelHeld && !isObjectMoving) {
@@ -197,20 +244,26 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       //     }
       //     case "pc": {
       if (window.viewer) {
-        const pointClouds = window.viewer.scene.pointclouds;
-        const resultPc = await PointCloudService.mouseCoordListener(
-          event,
-          pointClouds
-        );
-        if (resultPc.point.position.x == -1) {
-          StatusBarActions.clearCoords();
-          return;
-        }
-        StatusBarActions.setCoordinates(
-          Number(resultPc.point.position.x.toFixed(2)),
-          Number(resultPc.point.position.y.toFixed(2)),
-          Number(resultPc.point.position.z.toFixed(2))
-        );
+        // debounceTimeout = setTimeout(async () => {
+          const pointClouds = window.viewer.scene.pointclouds[0];
+          const resultPc = await PointCloudService.mouseCoordListener(
+            event,
+            pointClouds
+          );
+          console.error(resultPc.point.position);
+          if (resultPc.point.position.x == -1) {
+            StatusBarActions.clearCoords();
+            return;
+          }
+          StatusBarActions.setCoordinates(
+            Number(resultPc.point.position.x.toFixed(2)),
+            Number(resultPc.point.position.y.toFixed(2)),
+            Number(resultPc.point.position.z.toFixed(2))
+          );
+
+        //   clearTimeout(debounceTimeout);
+        //   debounceTimeout = null;
+        // }, DEBOUNCE_DELAY);
         // break;
       }
       //     }
@@ -233,6 +286,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
           id="potree_render_area"
           onMouseMove={potreeOnMouseMove}
           style={{
+            width: "100%",
             // height: `calc(100% - (${
             //   multiTabScreen.show ? "300px" : "0px"
             // }))`,
@@ -243,6 +297,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         <div
           id="potree_sidebar_container"
           style={{
+            width: "100%",
             // height: `calc(100% - (${
             //   multiTabScreen.show ? "300px" : "0px"
             // }))`,

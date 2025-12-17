@@ -25,13 +25,11 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 root.render(
-  <React.StrictMode>
     <Suspense fallback={<div>Loading...</div>}>
       <Provider store={store}>
         <App />
       </Provider>
     </Suspense>
-  </React.StrictMode>
 );
 
 // Potree için WebGL ve GPU optimizasyonları - global scope
