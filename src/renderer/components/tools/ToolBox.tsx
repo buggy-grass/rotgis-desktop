@@ -2,6 +2,7 @@ import React from "react";
 import { makeUseStyles } from "../../styles/makeUseStyles";
 import { Boxes, Wrench, X } from "lucide-react";
 import { Label } from "../ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 const useStyles = makeUseStyles({
   container: {
@@ -26,9 +27,9 @@ const useStyles = makeUseStyles({
     background: "#1e1e1e",
   },
   toolboxMenu: {
-    width: "40px",
+    width: "50px",
     height: "100%",
-    background: "#212121"
+    background: "#212121",
   },
   toolboxContent: {
     display: "flex",
@@ -41,6 +42,12 @@ const useStyles = makeUseStyles({
 
 function Toolbox() {
   const styles = useStyles();
+  const tablist = [
+    { value: "measurement", label: "Measurement", icon: Wrench },
+    { value: "drawing", label: "Drawing", icon: Wrench },
+    { value: "point_cloud", label: "Point Cloud", icon: Wrench },
+    { value: "mesh", label: "Mesh", icon: Wrench },
+  ];
   return (
     <div style={styles.container} className="border-r border-border">
       <div style={styles.header}>
@@ -55,7 +62,19 @@ function Toolbox() {
         </div>
       </div>
       <div style={styles.body}>
-        <div style={styles.toolboxMenu} className="border-r border-border"></div>
+        <div style={styles.toolboxMenu} className="border-r border-border">
+          <Tabs defaultValue="measurement" orientation="vertical" size="md" style={{padding: 0}}>
+            <TabsList onChange={(value) => {
+            console.log("Selected Tab:", value);
+          }}>
+              {tablist.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value} icon={tab.icon} style={{padding: 9.5}}/>
+              ))}
+            </TabsList>
+            <TabsContent value="account"></TabsContent>
+            <TabsContent value="password"></TabsContent>
+          </Tabs>
+        </div>
         <div style={styles.toolboxContent}></div>
       </div>
     </div>

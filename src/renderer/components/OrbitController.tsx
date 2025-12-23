@@ -37,8 +37,8 @@ const ThreeText: React.FC<{
       const font = new Font(helvetikerFont as any);
       const config = {
         font,
-        size: 0.4,
-        depth: 0.05,
+        size: 0.253,
+        depth: 0.031625,
         curveSegments: 12,
         bevelEnabled: false,
       };
@@ -68,12 +68,12 @@ const AxesHelper: React.FC<{ meshRef: React.RefObject<THREE.Mesh>; showText: boo
 
   // Z ve Y renklerini değiştir: Z -> blue, Y -> green
   const axesElements = [
-    { text: '-X', position: [-2.5, 0, 0] as [number, number, number], color: 'red' },
-    { text: '-Z', position: [0, -2.5, 0] as [number, number, number], color: 'blue' }, // Z artık blue
-    { text: '-Y', position: [0, 0, -2.5] as [number, number, number], color: 'green' }, // Y artık green
-    { text: 'X', position: [2.5, 0, 0] as [number, number, number], color: 'red' },
-    { text: 'Z', position: [0, 2.5, 0] as [number, number, number], color: 'blue' }, // Z artık blue
-    { text: 'Y', position: [0, 0, 2.5] as [number, number, number], color: 'green' }, // Y artık green
+    { text: '-X', position: [-1.58125, 0, 0] as [number, number, number], color: 'red' },
+    { text: '-Z', position: [0, -1.58125, 0] as [number, number, number], color: 'blue' }, // Z artık blue
+    { text: '-Y', position: [0, 0, -1.58125] as [number, number, number], color: 'green' }, // Y artık green
+    { text: 'X', position: [1.58125, 0, 0] as [number, number, number], color: 'red' },
+    { text: 'Z', position: [0, 1.58125, 0] as [number, number, number], color: 'blue' }, // Z artık blue
+    { text: 'Y', position: [0, 0, 1.58125] as [number, number, number], color: 'green' }, // Y artık green
   ];
 
   useFrame(() => {
@@ -101,7 +101,7 @@ const AxesHelper: React.FC<{ meshRef: React.RefObject<THREE.Mesh>; showText: boo
             <bufferAttribute
               attach="attributes-position"
               count={2}
-              array={new Float32Array([-2, 0, 0, 2, 0, 0])}
+              array={new Float32Array([-1.265, 0, 0, 1.265, 0, 0])}
               itemSize={3}
             />
           </bufferGeometry>
@@ -113,7 +113,7 @@ const AxesHelper: React.FC<{ meshRef: React.RefObject<THREE.Mesh>; showText: boo
             <bufferAttribute
               attach="attributes-position"
               count={2}
-              array={new Float32Array([0, 0, -2, 0, 0, 2])}
+              array={new Float32Array([0, 0, -1.265, 0, 0, 1.265])}
               itemSize={3}
             />
           </bufferGeometry>
@@ -125,7 +125,7 @@ const AxesHelper: React.FC<{ meshRef: React.RefObject<THREE.Mesh>; showText: boo
             <bufferAttribute
               attach="attributes-position"
               count={2}
-              array={new Float32Array([0, -2, 0, 0, 2, 0])}
+              array={new Float32Array([0, -1.265, 0, 0, 1.265, 0])}
               itemSize={3}
             />
           </bufferGeometry>
@@ -168,12 +168,12 @@ const Cube: React.FC<CubeProps> = ({ meshRef, onFaceClick, rotateToFace, showAxi
 
   // Z ve Y renklerini değiştir: Z -> blue, Y -> green (çubuklar için)
   const axesElements = [
-    { text: 'X', position: [1.1, 0, 0] as [number, number, number], rotation: [0, Math.PI / 2, 0] as [number, number, number], color: 'red' },
-    { text: '-X', position: [-1.1, 0, 0] as [number, number, number], rotation: [0, -Math.PI / 2, 0] as [number, number, number], color: 'red' },
-    { text: 'Z', position: [0, 1.1, 0] as [number, number, number], rotation: [-Math.PI / 2, 0, 0] as [number, number, number], color: 'blue' }, // Z artık blue
-    { text: '-Z', position: [0, -1.1, 0] as [number, number, number], rotation: [Math.PI / 2, 0, 0] as [number, number, number], color: 'blue' }, // Z artık blue
-    { text: 'Y', position: [0, 0, 1.1] as [number, number, number], rotation: [0, 0, 0] as [number, number, number], color: 'green' }, // Y artık green
-    { text: '-Y', position: [0, 0, -1.1] as [number, number, number], rotation: [0, Math.PI, 0] as [number, number, number], color: 'green' }, // Y artık green
+    { text: 'X', position: [0.69575, 0, 0] as [number, number, number], rotation: [0, Math.PI / 2, 0] as [number, number, number], color: 'red' },
+    { text: '-X', position: [-0.69575, 0, 0] as [number, number, number], rotation: [0, -Math.PI / 2, 0] as [number, number, number], color: 'red' },
+    { text: 'Z', position: [0, 0.69575, 0] as [number, number, number], rotation: [-Math.PI / 2, 0, 0] as [number, number, number], color: 'blue' }, // Z artık blue
+    { text: '-Z', position: [0, -0.69575, 0] as [number, number, number], rotation: [Math.PI / 2, 0, 0] as [number, number, number], color: 'blue' }, // Z artık blue
+    { text: 'Y', position: [0, 0, 0.69575] as [number, number, number], rotation: [0, 0, 0] as [number, number, number], color: 'green' }, // Y artık green
+    { text: '-Y', position: [0, 0, -0.69575] as [number, number, number], rotation: [0, Math.PI, 0] as [number, number, number], color: 'green' }, // Y artık green
   ];
 
   return (
@@ -183,7 +183,7 @@ const Cube: React.FC<CubeProps> = ({ meshRef, onFaceClick, rotateToFace, showAxi
         onPointerOver={() => setHovered(true)}
         onPointerOut={() => setHovered(false)}
       >
-        <boxGeometry args={[2, 2, 2]} />
+        <boxGeometry args={[1.265, 1.265, 1.265]} />
         <meshStandardMaterial
           color={hovered ? '#666666' : '#555555'}
           transparent={true}
@@ -193,10 +193,10 @@ const Cube: React.FC<CubeProps> = ({ meshRef, onFaceClick, rotateToFace, showAxi
 
       {showLine && (
         <lineSegments>
-          <edgesGeometry args={[new THREE.BoxGeometry(2, 2, 2)]} />
+          <edgesGeometry args={[new THREE.BoxGeometry(1.265, 1.265, 1.265)]} />
           <lineBasicMaterial
             color={hovered ? '#555555' : showAxis ? '#008F11' : '#454545'}
-            linewidth={0.2}
+            linewidth={0.1265}
             opacity={0}
           />
         </lineSegments>
@@ -361,8 +361,8 @@ const OrbitController: React.FC<OrbitControllerProps> = ({ className }) => {
         className
       )}
       style={{
-        width: '150px',
-        height: '150px',
+        width: '94.875px',
+        height: '94.875px',
         position: 'relative',
         backgroundColor: 'transparent',
         overflow: 'hidden',
@@ -375,7 +375,7 @@ const OrbitController: React.FC<OrbitControllerProps> = ({ className }) => {
           alpha: true,
           antialias: true,
         }}
-        camera={{ position: [0, 0, 5], fov: 75 }}
+        camera={{ position: [0, 0, 3.1625], fov: 75 }}
         style={{ 
           cursor: 'pointer', 
           borderRadius: '50%',
@@ -394,7 +394,7 @@ const OrbitController: React.FC<OrbitControllerProps> = ({ className }) => {
         }}
       >
         <ambientLight intensity={1} />
-        <pointLight position={[5, 5, 5]} />
+        <pointLight position={[3.1625, 3.1625, 3.1625]} />
         <Cube
           meshRef={meshRef}
           onFaceClick={handleFaceClick}
@@ -406,7 +406,7 @@ const OrbitController: React.FC<OrbitControllerProps> = ({ className }) => {
         <OrbitControls
           ref={orbitControlsRef}
           enableZoom={false}
-          maxDistance={5}
+          maxDistance={3.1625}
           enablePan={false}
           enableRotate={false}
         />

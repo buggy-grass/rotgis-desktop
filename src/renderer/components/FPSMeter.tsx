@@ -70,8 +70,8 @@ const FPSMeter: React.FC<FPSMeterProps> = ({ className }) => {
 
     // Canvas boyutunu ayarla (yüksek çözünürlük için scale)
     const dpr = window.devicePixelRatio || 1;
-    const width = 100;
-    const height = 60;
+    const width = 63.25;
+    const height = 37.95;
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     canvas.style.width = `${width}px`;
@@ -166,26 +166,26 @@ const FPSMeter: React.FC<FPSMeterProps> = ({ className }) => {
       // FPS metni (yeşil renk, görünür) - ÜSTTE
       // Önce arka plan (okunabilirlik için)
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(width / 2 - 35, 2, 70, 18);
+      ctx.fillRect(width / 2 - 22.1375, 1.265, 44.275, 11.385);
       
       // Yeşil renk
       ctx.fillStyle = 'rgba(17, 137, 61, 1)'; // Yeşil renk
-      ctx.font = 'bold 14px monospace';
+      ctx.font = 'bold 8.855px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       
-      ctx.fillText(`${currentFPS.toFixed(0)} FPS`, width / 2, 11);
+      ctx.fillText(`${currentFPS.toFixed(0)} FPS`, width / 2, 6.9575);
 
       // Yazının altından başlayacak şekilde çubuklar için alan
-      const textBottom = 22; // Yazının alt kenarı
-      const chartTop = textBottom + 10; // Çubukların başlangıç yeri
-      const chartHeight = height - chartTop - 15; // Çubuklar için kalan alan
+      const textBottom = 13.915; // Yazının alt kenarı
+      const chartTop = textBottom + 6.325; // Çubukların başlangıç yeri
+      const chartHeight = height - chartTop - 9.4875; // Çubuklar için kalan alan
 
       // Grid arka plan (çubukların olduğu alanda)
       ctx.strokeStyle = 'hsl(var(--muted))';
-      ctx.lineWidth = 0.5;
+      ctx.lineWidth = 0.31625;
       for (let i = 0; i <= 10; i++) {
-        const gridY = height - 10 - (i * chartHeight / 10);
+        const gridY = height - 6.325 - (i * chartHeight / 10);
         ctx.globalAlpha = 0.3;
         ctx.beginPath();
         ctx.moveTo(0, gridY);
@@ -198,12 +198,12 @@ const FPSMeter: React.FC<FPSMeterProps> = ({ className }) => {
       const barWidth = width / maxHistoryLength;
       // const barSpacing = 0;
       const maxBarHeight = chartHeight;
-      const depth = 2.5; // 3D derinlik
+      const depth = 1.58125; // 3D derinlik
 
       fpsHistoryRef.current.forEach((fps, index) => {
-        const barHeight = Math.max(1, (fps / 60) * maxBarHeight); // Minimum 1px
+        const barHeight = Math.max(0.6325, (fps / 60) * maxBarHeight); // Minimum 0.6325px
         const x = index * barWidth; // Tam soldan başla (0'dan)
-        const y = height - 10; // Alt kenar
+        const y = height - 6.325; // Alt kenar
 
         // Renk: FPS'e göre (yeşil -> sarı -> kırmızı) - daha canlı renkler
         let color: string;
@@ -223,11 +223,11 @@ const FPSMeter: React.FC<FPSMeterProps> = ({ className }) => {
 
       // Min/Max değerleri (daha küçük font)
       ctx.fillStyle = 'hsl(var(--muted-foreground))';
-      ctx.font = '9px monospace';
+      ctx.font = '5.6925px monospace';
       ctx.textAlign = 'left';
-      ctx.fillText('0', 0, height - 3);
+      ctx.fillText('0', 0, height - 1.8975);
       ctx.textAlign = 'right';
-      ctx.fillText('60', width, height - 3);
+      ctx.fillText('60', width, height - 1.8975);
     };
 
     const updateFPS = () => {

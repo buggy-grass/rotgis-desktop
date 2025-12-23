@@ -245,7 +245,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         PotreeBackgroundService.setupGradientGridBackground(window.viewer);
 
         // const exist = fs.existsSync("C:\\Users\\bugra.cimen\\Desktop\\bugra\\rotgis-desktop\\test_data\\metadata.json");
-        // loadPointCloud("C:\\Users\\bugra.cimen\\Desktop\\bugra\\rotgis-desktop\\test_data\\metadata.json", "pc");
+        loadPointCloud("C:\\Users\\bugra.cimen\\Desktop\\bugra\\rotgis-desktop\\test_data\\metadata.json", "pc");
         window.viewer.renderer.setClearColor(0x1f1f1f, 1);
         // Gradient-grid background'u aktif et
         window.viewer.setBackground("gradient-grid");
@@ -367,7 +367,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   if (!isPotreeReady) {
     return (
       <div id="viewerContainer" style={{display:"flex", margin:0, padding:0, width:"100%", height:"100%", position: "relative", alignItems: "center", justifyContent: "center"}}>
-        <div style={{color: "#fff", fontSize: "16px"}}>Potree yükleniyor...</div>
+        <div style={{color: "#fff", fontSize: "16px"}}>Viewer Loading</div>
       </div>
     );
   }

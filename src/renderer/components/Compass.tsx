@@ -57,7 +57,7 @@ const Compass: React.FC<CompassProps> = ({ className }) => {
 
     // Canvas boyutunu ayarla (yüksek çözünürlük için scale)
     const dpr = window.devicePixelRatio || 1;
-    const size = 60; // Pusula boyutu (yarı yarıya küçültüldü)
+    const size = 75.9; // Pusula boyutu (%15 büyütüldü)
     canvas.width = size * dpr;
     canvas.height = size * dpr;
     canvas.style.width = `${size}px`;
