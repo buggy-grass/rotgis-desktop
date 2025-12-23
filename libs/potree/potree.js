@@ -91184,8 +91184,9 @@ ENDSEC
 		}
 
 		loadGUI(callback){
-
+			console.error("-----------------------------------loadedGUI")
 			if(callback){
+				console.error("-----------------------------------loadedGUI")
 				this.onGUILoaded(callback);
 			}
 
@@ -91314,8 +91315,6 @@ ENDSEC
 						}
 					});
 				});
-
-				
 			});
 
 			return this.promiseGuiLoaded();

@@ -188,7 +188,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         // Gradient-grid background modunu ekle
         PotreeBackgroundService.setupGradientGridBackground(window.viewer);
 
-        loadPointCloud("C:\\Users\\bugra.cimen\\Desktop\\rotgis-desktop\\test_data\\metadata.json", "pc");
+        // loadPointCloud("C:\\Users\\bugra.cimen\\Desktop\\rotgis-desktop\\test_data\\metadata.json", "pc");
         window.viewer.renderer.setClearColor(0x1f1f1f, 1);
         // Gradient-grid background'u aktif et
         window.viewer.setBackground("gradient-grid");
