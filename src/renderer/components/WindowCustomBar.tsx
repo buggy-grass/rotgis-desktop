@@ -3,6 +3,8 @@ import { useSelector } from 'react-redux';
 import { Minus, Square, X, TabletSmartphone } from 'lucide-react';
 import { Button } from './ui/button';
 import { RootState } from '../store/store';
+import { Menubar } from './ui/menubar';
+import WindowMenu from './menu/WindowMenu';
 
 export function WindowCustomBar() {
   const [isMaximized, setIsMaximized] = useState(false);
@@ -105,10 +107,11 @@ export function WindowCustomBar() {
   }, []);
 
   return (
-    <div className="h-8 bg-background border-b border-border flex items-center justify-between select-none drag-region">
+    <div className="h-8 bg-background border-b border-border flex items-center justify-between select-none drag-region" style={{ zIndex: 10001, position: "relative" }}>
       {/* Sol taraf - Uygulama ismi */}
       <div className="flex items-center gap-2 px-4 no-drag">
-        <span className="text-xs font-medium text-foreground">{appName}</span>
+        {/* <span className="text-xs font-medium text-foreground">{appName}</span> */}
+        <WindowMenu />
       </div>
 
       {/* Orta - Proje ismi (drag region) */}

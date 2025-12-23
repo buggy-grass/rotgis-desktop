@@ -91440,6 +91440,7 @@ ENDSEC
 			this.renderer.autoClear = false;
 			this.renderArea.appendChild(this.renderer.domElement);
 			this.renderer.domElement.tabIndex = '2222';
+			this.renderer.domElement.style.zIndex = '9990';
 			this.renderer.domElement.style.position = 'absolute';
 			this.renderer.domElement.style.outline = 'none';
 			this.renderer.domElement.addEventListener('mousedown', () => {

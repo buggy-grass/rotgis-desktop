@@ -57,7 +57,7 @@ const Compass: React.FC<CompassProps> = ({ className }) => {
 
     // Canvas boyutunu ayarla (yüksek çözünürlük için scale)
     const dpr = window.devicePixelRatio || 1;
-    const size = 120; // Pusula boyutu
+    const size = 60; // Pusula boyutu (yarı yarıya küçültüldü)
     canvas.width = size * dpr;
     canvas.height = size * dpr;
     canvas.style.width = `${size}px`;
@@ -66,7 +66,7 @@ const Compass: React.FC<CompassProps> = ({ className }) => {
 
     const centerX = size / 2;
     const centerY = size / 2;
-    const radius = size / 2 - 10;
+    const radius = size / 2 - 5;
 
     // 3D görünümlü pusula çizimi
     const drawCompass = () => {
@@ -113,25 +113,25 @@ const Compass: React.FC<CompassProps> = ({ className }) => {
 
       directions.forEach((dir) => {
         const angle = ((dir.angle - rotation) * Math.PI) / 180;
-        const x = centerX + Math.sin(angle) * (radius - 15);
-        const y = centerY - Math.cos(angle) * (radius - 15);
+        const x = centerX + Math.sin(angle) * (radius - 7.5);
+        const y = centerY - Math.cos(angle) * (radius - 7.5);
 
         // Nokta işareti
         ctx.fillStyle = dir.color;
         ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
         ctx.fill();
 
         // Text
         ctx.fillStyle = dir.color;
-        ctx.font = dir.text === 'N' ? 'bold 14px sans-serif' : '12px sans-serif';
+        ctx.font = dir.text === 'N' ? 'bold 7px sans-serif' : '6px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
         // Text shadow
         ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-        ctx.shadowBlur = 2;
-        ctx.fillText(dir.text, x, y - 12);
+        ctx.shadowBlur = 1;
+        ctx.fillText(dir.text, x, y - 6);
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
       });
@@ -141,8 +141,8 @@ const Compass: React.FC<CompassProps> = ({ className }) => {
         const angle = ((i * 30 - rotation) * Math.PI) / 180;
         const isMajor = i % 3 === 0; // Her 90 derecede büyük çizgi
         
-        const startRadius = radius - (isMajor ? 12 : 8);
-        const endRadius = radius - 2;
+        const startRadius = radius - (isMajor ? 6 : 4);
+        const endRadius = radius - 1;
         
         const x1 = centerX + Math.sin(angle) * startRadius;
         const y1 = centerY - Math.cos(angle) * startRadius;
@@ -150,7 +150,7 @@ const Compass: React.FC<CompassProps> = ({ className }) => {
         const y2 = centerY - Math.cos(angle) * endRadius;
 
         ctx.strokeStyle = foregroundColor;
-        ctx.lineWidth = isMajor ? 2 : 1;
+        ctx.lineWidth = isMajor ? 1 : 0.5;
         ctx.globalAlpha = isMajor ? 1 : 0.6;
         ctx.beginPath();
         ctx.moveTo(x1, y1);
@@ -162,13 +162,13 @@ const Compass: React.FC<CompassProps> = ({ className }) => {
       // Merkez nokta ve gölge
       ctx.fillStyle = primaryColor;
       ctx.beginPath();
-      ctx.arc(centerX, centerY, 6, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, 3, 0, Math.PI * 2);
       ctx.fill();
 
       // İç gölge efekti
       ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
       ctx.beginPath();
-      ctx.arc(centerX - 2, centerY - 2, 4, 0, Math.PI * 2);
+      ctx.arc(centerX - 1, centerY - 1, 2, 0, Math.PI * 2);
       ctx.fill();
 
       // Pusula iğnesi (Kuzey-Güney)
@@ -179,27 +179,27 @@ const Compass: React.FC<CompassProps> = ({ className }) => {
       // Kuzey iğnesi (kırmızı, üçgen)
       ctx.fillStyle = 'rgb(239, 68, 68)';
       ctx.beginPath();
-      ctx.moveTo(0, -radius + 5);
-      ctx.lineTo(-8, 0);
-      ctx.lineTo(0, 15);
-      ctx.lineTo(8, 0);
+      ctx.moveTo(0, -radius + 2.5);
+      ctx.lineTo(-4, 0);
+      ctx.lineTo(0, 7.5);
+      ctx.lineTo(4, 0);
       ctx.closePath();
       ctx.fill();
 
       // Güney iğnesi (beyaz/gri, üçgen)
       ctx.fillStyle = foregroundColor;
       ctx.beginPath();
-      ctx.moveTo(0, radius - 5);
-      ctx.lineTo(-6, 0);
-      ctx.lineTo(0, -15);
-      ctx.lineTo(6, 0);
+      ctx.moveTo(0, radius - 2.5);
+      ctx.lineTo(-3, 0);
+      ctx.lineTo(0, -7.5);
+      ctx.lineTo(3, 0);
       ctx.closePath();
       ctx.fill();
 
       // İğne merkez noktası
       ctx.fillStyle = primaryColor;
       ctx.beginPath();
-      ctx.arc(0, 0, 5, 0, Math.PI * 2);
+      ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
