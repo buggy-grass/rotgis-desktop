@@ -36,6 +36,8 @@ import {
   MenubarRadioItem,
   MenubarShortcut,
 } from "../ui/menubar";
+import FolderStructure from "./FolderStructure";
+import LayerBox from "./LayerBox";
 
 const useStyles = makeUseStyles({
   container: {
@@ -122,7 +124,7 @@ function Toolbox() {
           />
         </div>
       </div>
-      <div style={styles.body}>
+      <div style={styles.body} className="overflow-x-hidden">
         <div style={styles.toolboxMenu} className="border-r border-border">
           <TooltipProvider>
             <div
@@ -189,130 +191,138 @@ function Toolbox() {
         </div>
         <div style={styles.toolboxContent}>
           {activeTab === "layers" && (
-            <div
-              style={styles.toolboxShortcut}
-              className="border-b border-t border-border px-1"
-            >
-              <TooltipProvider>
-                <Tooltip delayDuration={50}>
-                  <TooltipTrigger asChild>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        height: "40px",
-                        cursor: "pointer",
-                        position: "relative",
-                      }}
-                    >
-                      <Button
-                        className="flex items-center"
-                        variant={"naked"}
-                        style={{ width: "16px", height: "16px" }}
-                        icon={LayersPlus}
-                        iconClassName="w-1 h-1"
-                      />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="top"
-                    showArrow={false}
-                    style={{ marginBottom: "-10px" }}
-                  >
-                    <p>{"Add Layer"}</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip delayDuration={50}>
-                  <TooltipTrigger asChild>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        height: "40px",
-                        cursor: "pointer",
-                        position: "relative",
-                      }}
-                    >
-                      <Button
-                        className="flex items-center"
-                        variant={"naked"}
-                        style={{ width: "16px", height: "16px" }}
-                        icon={ListChevronsUpDown}
-                        iconClassName="w-1 h-1"
-                      />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="top"
-                    showArrow={false}
-                    style={{ marginBottom: "-10px" }}
-                  >
-                    <p>{"Expand All"}</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip delayDuration={50}>
-                  <TooltipTrigger asChild>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        height: "40px",
-                        cursor: "pointer",
-                        position: "relative",
-                      }}
-                    >
-                      <Button
-                        className="flex items-center"
-                        variant={"naked"}
-                        style={{ width: "16px", height: "16px" }}
-                        icon={ListChevronsDownUp}
-                        iconClassName="w-1 h-1"
-                      />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="top"
-                    showArrow={false}
-                    style={{ marginBottom: "-10px" }}
-                  >
-                    <p>{"Collapse All"}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <Menubar
-                className="h-4 text-xs"
-                style={{ border: "none", zIndex: 10002, position: "relative", background: "transparent" }}
+            <>
+              <div
+                style={styles.toolboxShortcut}
+                className="border-b border-t border-border px-1"
               >
-                <MenubarMenu>
-                  <MenubarTrigger asChild className="h-6 px-2 text-xs">
-                    <Button
-                      className="flex items-center"
-                      variant={"naked"}
-                      style={{ width: "16px", height: "16px" }}
-                      icon={Eye}
-                      iconClassName="w-1 h-1"
-                    />
-                  </MenubarTrigger>
-                  <MenubarContent className="text-xs" style={{ zIndex: 10002 }}>
-                    <MenubarItem className="text-xs py-1" inset>
-                      Show All Layers
-                    </MenubarItem>
-                    <MenubarItem className="text-xs py-1" inset>
-                      Hide All Layers
-                    </MenubarItem>
-                    <MenubarItem className="text-xs py-1" inset>
-                      Show Selected Layer
-                    </MenubarItem>
-                    <MenubarItem className="text-xs py-1" inset>
-                      Hide Selected Layer
-                    </MenubarItem>
-                  </MenubarContent>
-                </MenubarMenu>
-              </Menubar>
-            </div>
+                <TooltipProvider>
+                  <Tooltip delayDuration={50}>
+                    <TooltipTrigger asChild>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          height: "40px",
+                          cursor: "pointer",
+                          position: "relative",
+                        }}
+                      >
+                        <Button
+                          className="flex items-center"
+                          variant={"naked"}
+                          style={{ width: "16px", height: "16px" }}
+                          icon={LayersPlus}
+                          iconClassName="w-1 h-1"
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      showArrow={false}
+                      style={{ marginBottom: "-10px" }}
+                    >
+                      <p>{"Add Layer"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip delayDuration={50}>
+                    <TooltipTrigger asChild>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          height: "40px",
+                          cursor: "pointer",
+                          position: "relative",
+                        }}
+                      >
+                        <Button
+                          className="flex items-center"
+                          variant={"naked"}
+                          style={{ width: "16px", height: "16px" }}
+                          icon={ListChevronsUpDown}
+                          iconClassName="w-1 h-1"
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      showArrow={false}
+                      style={{ marginBottom: "-10px" }}
+                    >
+                      <p>{"Expand All"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip delayDuration={50}>
+                    <TooltipTrigger asChild>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          height: "40px",
+                          cursor: "pointer",
+                          position: "relative",
+                        }}
+                      >
+                        <Button
+                          className="flex items-center"
+                          variant={"naked"}
+                          style={{ width: "16px", height: "16px" }}
+                          icon={ListChevronsDownUp}
+                          iconClassName="w-1 h-1"
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      showArrow={false}
+                      style={{ marginBottom: "-10px" }}
+                    >
+                      <p>{"Collapse All"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Menubar
+                  className="h-4 text-xs"
+                  style={{ border: "none", zIndex: 10002, position: "relative", background: "transparent" }}
+                >
+                  <MenubarMenu>
+                    <MenubarTrigger asChild className="h-6 px-2 text-xs">
+                      <Button
+                        className="flex items-center"
+                        variant={"naked"}
+                        style={{ width: "16px", height: "16px" }}
+                        icon={Eye}
+                        iconClassName="w-1 h-1"
+                      />
+                    </MenubarTrigger>
+                    <MenubarContent className="text-xs" style={{ zIndex: 10002 }}>
+                      <MenubarItem className="text-xs py-1" inset>
+                        Show All Layers
+                      </MenubarItem>
+                      <MenubarItem className="text-xs py-1" inset>
+                        Hide All Layers
+                      </MenubarItem>
+                      <MenubarItem className="text-xs py-1" inset>
+                        Show Selected Layer
+                      </MenubarItem>
+                      <MenubarItem className="text-xs py-1" inset>
+                        Hide Selected Layer
+                      </MenubarItem>
+                    </MenubarContent>
+                  </MenubarMenu>
+                </Menubar>
+              </div>
+              <div style={{ height: "calc(100% - 30px)", overflow: "auto" }}>
+                <LayerBox />
+              </div>
+            </>
+          )}
+          {activeTab === "folder_structure" && (
+            <FolderStructure />
           )}
         </div>
       </div>

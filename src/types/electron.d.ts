@@ -1,3 +1,10 @@
+export interface FileSystemItem {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  children?: FileSystemItem[];
+}
+
 export interface ElectronAPI {
   platform: string;
   windowMinimize: () => void;
@@ -7,6 +14,7 @@ export interface ElectronAPI {
   onWindowMaximize: (callback: (isMaximized: boolean) => void) => void;
   onWindowUnmaximize: (callback: () => void) => void;
   removeAllListeners: (channel: string) => void;
+  readDirectory: (dirPath: string) => Promise<FileSystemItem[]>;
 }
 
 declare global {

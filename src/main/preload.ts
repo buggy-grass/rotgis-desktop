@@ -32,5 +32,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeAllListeners: (channel: string) => {
     ipcRenderer.removeAllListeners(channel);
   },
+  
+  // File system operations
+  readDirectory: (dirPath: string) => {
+    return ipcRenderer.invoke('read-directory', dirPath);
+  },
 });
 

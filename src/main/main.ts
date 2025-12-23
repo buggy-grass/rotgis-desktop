@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import { spawn } from 'child_process';
+import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -246,7 +248,16 @@ function createWindow(): void {
     const injectElectronAPI = () => {
       mainWindow?.webContents.executeJavaScript(`
         (function() {
-          if (window.electronAPI) return; // Zaten varsa tekrar inject etme
+          if (window.electronAPI) {
+            // Zaten varsa readDirectory'yi kontrol et ve ekle
+            if (!window.electronAPI.readDirectory) {
+              const { ipcRenderer } = require('electron');
+              window.electronAPI.readDirectory = (dirPath) => {
+                return ipcRenderer.invoke('read-directory', dirPath);
+              };
+            }
+            return;
+          }
           const { ipcRenderer } = require('electron');
           window.electronAPI = {
             platform: '${process.platform}',
@@ -266,8 +277,12 @@ function createWindow(): void {
             },
             removeAllListeners: (channel) => {
               ipcRenderer.removeAllListeners(channel);
+            },
+            readDirectory: (dirPath) => {
+              return ipcRenderer.invoke('read-directory', dirPath);
             }
           };
+          console.log('ElectronAPI injected with readDirectory:', typeof window.electronAPI.readDirectory);
         })();
       `).catch(console.error);
     };
@@ -303,6 +318,69 @@ ipcMain.on('window-close', () => {
 
 ipcMain.handle('window-is-maximized', () => {
   return mainWindow ? mainWindow.isMaximized() : false;
+});
+
+// File system IPC handlers
+interface FileSystemItem {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  children?: FileSystemItem[];
+}
+
+async function readDirectory(dirPath: string): Promise<FileSystemItem[]> {
+  try {
+    const items: FileSystemItem[] = [];
+    const entries = await fsPromises.readdir(dirPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+      const item: FileSystemItem = {
+        name: entry.name,
+        path: fullPath,
+        type: entry.isDirectory() ? 'directory' : 'file',
+      };
+
+      if (entry.isDirectory()) {
+        try {
+          item.children = await readDirectory(fullPath);
+        } catch (error) {
+          // Permission denied veya diğer hatalar için boş children
+          item.children = [];
+        }
+      }
+
+      items.push(item);
+    }
+
+    return items.sort((a, b) => {
+      // Önce klasörler, sonra dosyalar
+      if (a.type !== b.type) {
+        return a.type === 'directory' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  } catch (error) {
+    console.error(`Error reading directory ${dirPath}:`, error);
+    throw error;
+  }
+}
+
+ipcMain.handle('read-directory', async (_event, dirPath: string): Promise<FileSystemItem[]> => {
+  try {
+    // Güvenlik kontrolü - path'in geçerli olduğundan emin ol
+    const normalizedPath = path.normalize(dirPath);
+    const stats = await fsPromises.stat(normalizedPath);
+    
+    if (!stats.isDirectory()) {
+      throw new Error('Path is not a directory');
+    }
+
+    return await readDirectory(normalizedPath);
+  } catch (error) {
+    console.error('Error in read-directory handler:', error);
+    throw error;
+  }
 });
 
 // Windows'ta dedicated GPU'yu zorla (Optimus sistemler için)
