@@ -143,6 +143,10 @@
         // Potree'nin yüklendiğini kontrol et
         if (typeof window.Potree !== 'undefined') {
           console.log('✅ Potree is available:', window.Potree);
+          // Potree hazır olduğunu işaretle
+          window.potreeReady = true;
+          // Custom event dispatch et
+          window.dispatchEvent(new CustomEvent('potreeReady'));
         } else {
           console.warn('⚠️ Potree not found in window.Potree');
         }

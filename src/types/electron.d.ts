@@ -17,6 +17,7 @@ declare global {
     pointSizeType: number;
     eventBus: any;
     THREE: any;
+    potreeReady?: boolean;
   }
 }
 

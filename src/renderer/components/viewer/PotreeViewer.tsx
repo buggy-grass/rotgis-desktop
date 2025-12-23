@@ -13,6 +13,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const canvasRef = React.useRef<HTMLElement | null>(null);
   const [isMouseWheelHeld, setIsMouseWheelHeld] = React.useState(false);
   const [isObjectMoving, setIsObjectMoving] = React.useState(false);
+  const [isPotreeReady, setIsPotreeReady] = React.useState(false);
   const webGLContextLost = React.useRef(false);
 
   const handleContextLost = async (event: Event) => {
@@ -64,7 +65,56 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     }
   };
 
+  // Potree'nin yüklenmesini bekle
   useEffect(() => {
+    const checkPotreeReady = () => {
+      if (typeof window.Potree !== 'undefined' || (window as any).potreeReady) {
+        setIsPotreeReady(true);
+        return true;
+      }
+      return false;
+    };
+
+    // Eğer Potree zaten yüklüyse
+    if (checkPotreeReady()) {
+      return;
+    }
+
+    // Potree ready event'ini dinle
+    const handlePotreeReady = () => {
+      setIsPotreeReady(true);
+    };
+
+    window.addEventListener('potreeReady', handlePotreeReady);
+
+    // Polling fallback - eğer event gelmezse kontrol et
+    const pollInterval = setInterval(() => {
+      if (checkPotreeReady()) {
+        clearInterval(pollInterval);
+      }
+    }, 100);
+
+    // Timeout - 10 saniye sonra hata ver
+    const timeout = setTimeout(() => {
+      clearInterval(pollInterval);
+      if (!isPotreeReady) {
+        console.error('❌ Potree yüklenemedi - timeout');
+      }
+    }, 10000);
+
+    return () => {
+      window.removeEventListener('potreeReady', handlePotreeReady);
+      clearInterval(pollInterval);
+      clearTimeout(timeout);
+    };
+  }, [isPotreeReady]);
+
+  // Potree hazır olduğunda viewer'ı yükle
+  useEffect(() => {
+    if (!isPotreeReady) {
+      return;
+    }
+
     const loadPotreeViewer = async () => {
       await loadViewer();
     };
@@ -88,7 +138,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       const oldCanvas = window.viewer?.renderer?.domElement;
       oldCanvas?.remove();
     };
-  }, []);
+  }, [isPotreeReady]);
 
   useEffect(() => {
     const handleMouseDown = (event: any) => {
@@ -121,6 +171,12 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
 
   const loadViewer = async () => {
     try {
+      // Potree'nin yüklü olduğundan emin ol
+      if (typeof window.Potree === 'undefined') {
+        console.error('Potree is not loaded yet');
+        return;
+      }
+
       if (window.viewer) {
         window.viewer = null;
       }
@@ -188,7 +244,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         // Gradient-grid background modunu ekle
         PotreeBackgroundService.setupGradientGridBackground(window.viewer);
 
-        // loadPointCloud("C:\\Users\\bugra.cimen\\Desktop\\rotgis-desktop\\test_data\\metadata.json", "pc");
+        loadPointCloud("C:\\Users\\bugra.cimen\\Desktop\\bugra\\rotgis-desktop\\test_data\\metadata.json", "pc");
         window.viewer.renderer.setClearColor(0x1f1f1f, 1);
         // Gradient-grid background'u aktif et
         window.viewer.setBackground("gradient-grid");
@@ -305,6 +361,16 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       }
     }
   };
+
+  // Potree hazır olana kadar loading göster
+  if (!isPotreeReady) {
+    return (
+      <div id="viewerContainer" style={{display:"flex", margin:0, padding:0, width:"100%", height:"100%", position: "relative", alignItems: "center", justifyContent: "center"}}>
+        <div style={{color: "#fff", fontSize: "16px"}}>Potree yükleniyor...</div>
+      </div>
+    );
+  }
+
   return (
     <div id="viewerContainer" style={{display:"flex", margin:0, padding:0, width:"100%", height:"100%", position: "relative"}}>
       {/* 3D FPS Meter - Sağ üst köşe */}

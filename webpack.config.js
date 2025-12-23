@@ -43,6 +43,10 @@ if (process.env.WEBPACK_SERVE) {
             loader: 'ts-loader',
             options: {
               transpileOnly: true, // Type checking'i atla, sadece transpile et
+              compilerOptions: {
+                noUnusedLocals: false,
+                noUnusedParameters: false,
+              }
             }
           }]
         },
@@ -192,6 +196,10 @@ if (process.env.WEBPACK_SERVE) {
             loader: 'ts-loader',
             options: {
               transpileOnly: true, // Type checking'i atla, sadece transpile et
+              compilerOptions: {
+                noUnusedLocals: false,
+                noUnusedParameters: false,
+              }
             }
           }]
         },

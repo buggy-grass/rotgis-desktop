@@ -7,6 +7,12 @@ yarn.lock
 dist/
 build/
 
+# Webpack cache
+.webpack-cache-dev/
+
+# Test data
+test_data/
+
 # IDE
 .vscode/
 .idea/
