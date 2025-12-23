@@ -38,8 +38,8 @@ function Main() {
         <ResizablePanel
           defaultSize={325}
           minSize={100}
-          maxSize={600}
-          style={{ minWidth: "100px", maxWidth: "600px" }}
+          maxSize={325}
+          style={{ minWidth: "100px", maxWidth: "325px" }}
         >
           <Tools />
         </ResizablePanel>

@@ -62,7 +62,7 @@ const TabsList = React.forwardRef<
   const { orientation, size } = React.useContext(TabsContext)
   
   const sizeClasses = {
-    sm: orientation === "horizontal" ? "h-5 p-1" : "w-20 p-1",
+    sm: orientation === "horizontal" ? "h-5 p-2" : "w-20 p-2",
     md: orientation === "horizontal" ? "h-6 p-2" : "w-24 p-2",
     lg: orientation === "horizontal" ? "h-8 p-3" : "w-28 p-3",
   }
