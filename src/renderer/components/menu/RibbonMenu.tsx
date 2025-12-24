@@ -28,6 +28,7 @@ import {
   Navigation,
   Eye,
   EyeOff,
+  LucideIcon,
 } from "lucide-react";
 
 const useStyles = makeUseStyles({
@@ -71,7 +72,7 @@ interface RibbonGroup {
   title: string;
   buttons: {
     label: string;
-    icon: React.ComponentType<{ className?: string }>;
+    icon: LucideIcon;
     onClick?: () => void;
     variant?: "default" | "ghost" | "outline";
     size?: "sm" | "default" | "lg";
@@ -81,7 +82,7 @@ interface RibbonGroup {
 interface RibbonTab {
   value: string;
   label: string;
-  icon?: React.ComponentType<{ className?: string }>;
+  icon?: LucideIcon;
   groups: RibbonGroup[];
 }
 
