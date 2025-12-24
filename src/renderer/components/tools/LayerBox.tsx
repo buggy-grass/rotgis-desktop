@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useImperativeHandle, forwardRef } from 'react';
 import {
   Accordion,
   AccordionContent,
@@ -14,7 +14,14 @@ interface Layer {
   children?: Layer[];
 }
 
-function Layers() {
+export interface LayersRef {
+  expandAll: () => void;
+  collapseAll: () => void;
+}
+
+interface LayersProps {}
+
+const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
   const [layers, setLayers] = useState<Layer[]>([
     {
       id: '1',
@@ -52,6 +59,31 @@ function Layers() {
     },
   ]);
 
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
+
+  // Get all layer IDs that have children
+  const getAllLayerIdsWithChildren = (items: Layer[]): string[] => {
+    const ids: string[] = [];
+    items.forEach((item) => {
+      if (item.children && item.children.length > 0) {
+        ids.push(item.id);
+        ids.push(...getAllLayerIdsWithChildren(item.children));
+      }
+    });
+    return ids;
+  };
+
+  // Expose expand/collapse functions via ref
+  useImperativeHandle(ref, () => ({
+    expandAll: () => {
+      const allIds = getAllLayerIdsWithChildren(layers);
+      setExpandedItems(allIds);
+    },
+    collapseAll: () => {
+      setExpandedItems([]);
+    },
+  }), [layers]);
+
   const toggleVisibility = (layerId: string) => {
     const updateLayer = (items: Layer[]): Layer[] => {
       return items.map((item) => {
@@ -67,16 +99,33 @@ function Layers() {
     setLayers(updateLayer(layers));
   };
 
+  const handleAccordionChange = (layerId: string, value: string) => {
+    setExpandedItems((prev) => {
+      if (value === layerId) {
+        // Opening
+        return prev.includes(layerId) ? prev : [...prev, layerId];
+      } else {
+        // Closing
+        return prev.filter((id) => id !== layerId);
+      }
+    });
+  };
+
   const renderLayer = (layer: Layer, level: number = 0): React.ReactNode => {
     const hasChildren = layer.children && layer.children.length > 0;
 
     if (hasChildren) {
+      const isExpanded = expandedItems.includes(layer.id);
       return (
         <Accordion
           key={layer.id}
           type="single"
           collapsible
           className="w-full"
+          value={isExpanded ? layer.id : ""}
+          onValueChange={(value) => {
+            handleAccordionChange(layer.id, value);
+          }}
         >
           <AccordionItem value={layer.id} className="border-none">
             <AccordionTrigger className="py-1 px-2 hover:bg-accent rounded-sm text-xs">
@@ -171,6 +220,8 @@ function Layers() {
       )}
     </div>
   );
-}
+});
+
+Layers.displayName = 'Layers';
 
 export default Layers;

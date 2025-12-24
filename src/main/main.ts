@@ -280,6 +280,12 @@ function createWindow(): void {
             },
             readDirectory: (dirPath) => {
               return ipcRenderer.invoke('read-directory', dirPath);
+            },
+            deleteFile: (filePath) => {
+              return ipcRenderer.invoke('delete-file', filePath);
+            },
+            openInExplorer: (filePath) => {
+              return ipcRenderer.invoke('open-in-explorer', filePath);
             }
           };
           console.log('ElectronAPI injected with readDirectory:', typeof window.electronAPI.readDirectory);
@@ -379,6 +385,47 @@ ipcMain.handle('read-directory', async (_event, dirPath: string): Promise<FileSy
     return await readDirectory(normalizedPath);
   } catch (error) {
     console.error('Error in read-directory handler:', error);
+    throw error;
+  }
+});
+
+// Delete file or directory
+ipcMain.handle('delete-file', async (_event, filePath: string): Promise<void> => {
+  try {
+    const normalizedPath = path.normalize(filePath);
+    const stats = await fsPromises.stat(normalizedPath);
+    
+    if (stats.isDirectory()) {
+      await fsPromises.rm(normalizedPath, { recursive: true, force: true });
+    } else {
+      await fsPromises.unlink(normalizedPath);
+    }
+  } catch (error) {
+    console.error('Error in delete-file handler:', error);
+    throw error;
+  }
+});
+
+// Open file/folder in system explorer
+ipcMain.handle('open-in-explorer', async (_event, filePath: string): Promise<void> => {
+  try {
+    const normalizedPath = path.normalize(filePath);
+    const { shell } = require('electron');
+    
+    if (process.platform === 'win32') {
+      // Windows: Show in Explorer
+      shell.showItemInFolder(normalizedPath);
+    } else if (process.platform === 'darwin') {
+      // macOS: Reveal in Finder
+      shell.showItemInFolder(normalizedPath);
+    } else {
+      // Linux: Open containing folder
+      const { exec } = require('child_process');
+      const dirPath = path.dirname(normalizedPath);
+      exec(`xdg-open "${dirPath}"`);
+    }
+  } catch (error) {
+    console.error('Error in open-in-explorer handler:', error);
     throw error;
   }
 });

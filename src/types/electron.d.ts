@@ -15,6 +15,8 @@ export interface ElectronAPI {
   onWindowUnmaximize: (callback: () => void) => void;
   removeAllListeners: (channel: string) => void;
   readDirectory: (dirPath: string) => Promise<FileSystemItem[]>;
+  deleteFile: (filePath: string) => Promise<void>;
+  openInExplorer: (filePath: string) => Promise<void>;
 }
 
 declare global {

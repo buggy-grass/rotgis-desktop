@@ -37,5 +37,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readDirectory: (dirPath: string) => {
     return ipcRenderer.invoke('read-directory', dirPath);
   },
+  deleteFile: (filePath: string) => {
+    return ipcRenderer.invoke('delete-file', filePath);
+  },
+  openInExplorer: (filePath: string) => {
+    return ipcRenderer.invoke('open-in-explorer', filePath);
+  },
 });
 

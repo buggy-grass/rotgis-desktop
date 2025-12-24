@@ -31,15 +31,15 @@ function Main() {
       <ResizablePanelGroup
         direction="horizontal"
         style={{
-          height: "calc(100vh - 202px)",
+          height: "calc(100vh - 183px)",
           width: "100vw",
         }}
       >
         <ResizablePanel
           defaultSize={325}
-          minSize={100}
+          minSize={262}
           maxSize={325}
-          style={{ minWidth: "100px", maxWidth: "325px" }}
+          style={{ minWidth: "262px", maxWidth: "325px" }}
         >
           <Tools />
         </ResizablePanel>
@@ -47,7 +47,7 @@ function Main() {
         <ResizablePanel defaultSize={75} minSize={30}>
           <div
             style={{
-              height: "calc(100vh - 202px)",
+              height: "calc(100vh - 183px)",
               width: "100%",
               position: "relative",
             }}

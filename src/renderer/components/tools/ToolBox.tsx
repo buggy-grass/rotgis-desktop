@@ -37,7 +37,7 @@ import {
   MenubarShortcut,
 } from "../ui/menubar";
 import FolderStructure from "./FolderStructure";
-import LayerBox from "./LayerBox";
+import LayerBox, { LayersRef } from "./LayerBox";
 
 const useStyles = makeUseStyles({
   container: {
@@ -70,7 +70,7 @@ const useStyles = makeUseStyles({
     display: "flex",
     flexDirection: "column",
     height: "100%",
-    width: "calc(100% - 40px)",
+    width: "calc(100% - 50px)",
   },
   toolboxShortcut: {
     height: "30px",
@@ -87,6 +87,7 @@ function Toolbox() {
   const [activeTab, setActiveTab] = React.useState<string>("layers");
   const tabRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
   const indicatorRef = React.useRef<HTMLDivElement>(null);
+  const layersRef = React.useRef<LayersRef>(null);
 
   const tablist = [
     { value: "layers", label: "Layers", icon: Layers },
@@ -237,6 +238,11 @@ function Toolbox() {
                           cursor: "pointer",
                           position: "relative",
                         }}
+                        onClick={() => {
+                          if (layersRef.current) {
+                            layersRef.current.expandAll();
+                          }
+                        }}
                       >
                         <Button
                           className="flex items-center"
@@ -265,6 +271,11 @@ function Toolbox() {
                           height: "40px",
                           cursor: "pointer",
                           position: "relative",
+                        }}
+                        onClick={() => {
+                          if (layersRef.current) {
+                            layersRef.current.collapseAll();
+                          }
                         }}
                       >
                         <Button
@@ -317,7 +328,7 @@ function Toolbox() {
                 </Menubar>
               </div>
               <div style={{ height: "calc(100% - 30px)", overflow: "auto" }}>
-                <LayerBox />
+                <LayerBox ref={layersRef} />
               </div>
             </>
           )}

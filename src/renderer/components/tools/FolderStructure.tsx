@@ -5,7 +5,22 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '../ui/accordion';
-import { Folder, File, ChevronRight, FolderOpen } from 'lucide-react';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '../ui/context-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import { Folder, File, ChevronRight, FolderOpen, Trash2, ExternalLink, AlertTriangle } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 
@@ -25,6 +40,10 @@ function FolderStructure({ rootPath: initialPath }: FolderStructureProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPath, setCurrentPath] = useState<string>(initialPath || '');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ path: string; name: string } | null>(null);
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   useEffect(() => {
     if (currentPath) {
@@ -66,6 +85,49 @@ function FolderStructure({ rootPath: initialPath }: FolderStructureProps) {
     }
   };
 
+  const handleDeleteClick = (itemPath: string, itemName: string) => {
+    setItemToDelete({ path: itemPath, name: itemName });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!itemToDelete) return;
+
+    try {
+      if (window.electronAPI && window.electronAPI.deleteFile) {
+        await window.electronAPI.deleteFile(itemToDelete.path);
+        setDeleteDialogOpen(false);
+        setItemToDelete(null);
+        // Reload directory after deletion
+        if (currentPath) {
+          await loadDirectory(currentPath);
+        }
+      } else {
+        setErrorMessage('Delete function not available');
+        setErrorDialogOpen(true);
+      }
+    } catch (err: any) {
+      setErrorMessage(`Failed to delete: ${err.message || 'Unknown error'}`);
+      setErrorDialogOpen(true);
+      console.error('Error deleting file:', err);
+    }
+  };
+
+  const handleOpenInExplorer = async (itemPath: string) => {
+    try {
+      if (window.electronAPI && window.electronAPI.openInExplorer) {
+        await window.electronAPI.openInExplorer(itemPath);
+      } else {
+        setErrorMessage('Open in Explorer function not available');
+        setErrorDialogOpen(true);
+      }
+    } catch (err: any) {
+      setErrorMessage(`Failed to open in Explorer: ${err.message || 'Unknown error'}`);
+      setErrorDialogOpen(true);
+      console.error('Error opening in Explorer:', err);
+    }
+  };
+
   const renderFileTree = (items: FileSystemItem[], level: number = 0): React.ReactNode => {
     if (!items || items.length === 0) {
       return null;
@@ -77,40 +139,80 @@ function FolderStructure({ rootPath: initialPath }: FolderStructureProps) {
           if (item.type === 'directory') {
             const hasChildren = item.children && item.children.length > 0;
             return (
-              <Accordion
-                key={item.path}
-                type="single"
-                collapsible
-                className="w-full"
-              >
-                <AccordionItem value={item.path} className="border-none">
-                  <AccordionTrigger className="py-1 px-2 hover:bg-accent rounded-sm text-xs">
-                    <div className="flex items-center gap-2 flex-1 text-left">
-                      <Folder className="h-3 w-3 text-blue-400 flex-shrink-0" />
-                      <span className="truncate">{item.name}</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-0 pt-0">
-                    {hasChildren ? (
-                      renderFileTree(item.children!, level + 1)
-                    ) : (
-                      <div className="pl-4 text-xs text-muted-foreground py-1">
-                        Empty folder
-                      </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
+              <ContextMenu key={item.path}>
+                <ContextMenuTrigger asChild>
+                  <div>
+                    <Accordion
+                      type="single"
+                      collapsible
+                      className="w-full"
+                    >
+                      <AccordionItem value={item.path} className="border-none">
+                        <AccordionTrigger className="py-1 px-2 hover:bg-accent rounded-sm text-xs">
+                          <div className="flex items-center gap-2 flex-1 text-left">
+                            <Folder className="h-3 w-3 text-blue-400 flex-shrink-0" />
+                            <span className="truncate">{item.name}</span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-0 pt-0">
+                          {hasChildren ? (
+                            renderFileTree(item.children!, level + 1)
+                          ) : (
+                            <div className="pl-4 text-xs text-muted-foreground py-1">
+                              Empty folder
+                            </div>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-48">
+                  <ContextMenuItem
+                    onClick={() => handleOpenInExplorer(item.path)}
+                    className="text-xs"
+                  >
+                    <ExternalLink className="mr-2 h-3 w-3" />
+                    Open in Explorer
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    onClick={() => handleDeleteClick(item.path, item.name)}
+                    className="text-xs text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-3 w-3" />
+                    Delete
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             );
           } else {
             return (
-              <div
-                key={item.path}
-                className="flex items-center gap-2 py-1 px-2 hover:bg-accent rounded-sm text-xs"
-              >
-                <File className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                <span className="truncate">{item.name}</span>
-              </div>
+              <ContextMenu key={item.path}>
+                <ContextMenuTrigger asChild>
+                  <div className="flex items-center gap-2 py-1 px-2 hover:bg-accent rounded-sm text-xs cursor-pointer">
+                    <File className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    <span className="truncate">{item.name}</span>
+                  </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-48">
+                  <ContextMenuItem
+                    onClick={() => handleOpenInExplorer(item.path)}
+                    className="text-xs"
+                  >
+                    <ExternalLink className="mr-2 h-3 w-3" />
+                    Open in Explorer
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    onClick={() => handleDeleteClick(item.path, item.name)}
+                    className="text-xs text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-3 w-3" />
+                    Delete
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             );
           }
         })}
@@ -184,6 +286,80 @@ function FolderStructure({ rootPath: initialPath }: FolderStructureProps) {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent 
+          className="sm:max-w-[425px]"
+          title="Delete Item"
+        >
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs text-foreground">
+                  Are you sure you want to delete <strong>"{itemToDelete?.name}"</strong>?
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-3 text-xs"
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setItemToDelete(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                className="h-7 px-3 text-xs"
+                onClick={handleDeleteConfirm}
+              >
+                <Trash2 className="mr-1.5 h-3 w-3" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Error Dialog */}
+      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <DialogContent 
+          className="sm:max-w-[425px]"
+          title="Error"
+        >
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-foreground flex-1">
+                {errorMessage}
+              </p>
+            </div>
+            <div className="flex justify-end pt-1">
+              <Button
+                variant="default"
+                size="sm"
+                className="h-7 px-3 text-xs"
+                onClick={() => {
+                  setErrorDialogOpen(false);
+                  setErrorMessage('');
+                }}
+              >
+                OK
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
