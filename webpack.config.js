@@ -76,6 +76,8 @@ if (process.env.WEBPACK_SERVE) {
       // Module resolution optimizasyonları
       symlinks: false,
       cacheWithContext: false,
+      // OpenLayers için node_modules'ü resolve et
+      modules: ['node_modules'],
     },
     // Webpack-dev-server için externals kaldırıldı (nodeIntegration: true olduğu için)
     // Development'ta optimizasyonları kapat (hızlı build için)
@@ -229,6 +231,8 @@ if (process.env.WEBPACK_SERVE) {
       // Module resolution optimizasyonları
       symlinks: false,
       cacheWithContext: false,
+      // OpenLayers için node_modules'ü resolve et
+      modules: ['node_modules'],
       // Alias optimizasyonları (Potree için)
       alias: {
         '@': path.resolve(__dirname, 'src'),

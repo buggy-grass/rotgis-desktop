@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react";
 import PointCloudService from "../../services/PointCloudService";
 import StatusBarActions from "../../store/actions/StatusBarActions";
 import PotreeService from "../../services/PotreeService";
@@ -15,11 +15,64 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const [isObjectMoving, setIsObjectMoving] = React.useState(false);
   const [isPotreeReady, setIsPotreeReady] = React.useState(false);
   const webGLContextLost = React.useRef(false);
+  const viewerLoadedRef = React.useRef(false); // Viewer'ın yüklenip yüklenmediğini takip et
+  const loadViewerRef = React.useRef<(() => Promise<void>) | null>(null);
+  const handleContextLostRef = React.useRef<((event: Event) => Promise<void>) | null>(null);
+  const handleContextRestoredRef = React.useRef<(() => Promise<void>) | null>(null);
 
-  const handleContextLost = async (event: Event) => {
-    event.preventDefault(); // 🔴 En önemli satır bu
+  const clear = useCallback(async () => {
+    await PointCloudService.removePointClouds();
+  }, []);
+
+  // handleContextLost ve handleContextRestored'ı önce tanımla (loadViewer'da kullanılacak)
+  const handleContextRestored = useCallback(async () => {
+    // console.log("WebGL context RESTORED");
+    console.log("✅ WebGL context RESTORED - PotreeViewer");
+
+    webGLContextLost.current = false;
+    if (potreeRenderAreaRef && potreeRenderAreaRef.current) {
+      if (canvasRef.current) {
+        if (handleContextLostRef.current) {
+          canvasRef.current.removeEventListener(
+            "webglcontextlost",
+            handleContextLostRef.current
+          );
+        }
+        if (handleContextRestoredRef.current) {
+          canvasRef.current.removeEventListener(
+            "webglcontextrestored",
+            handleContextRestoredRef.current
+          );
+        }
+      }
+      potreeRenderAreaRef.current.innerHTML = "";
+
+      // Reset viewer loaded flag so it can be reloaded after context restore
+      viewerLoadedRef.current = false;
+
+      //   setOrbitControllerKey((prev) => prev + 1);
+      if (loadViewerRef.current) {
+        await loadViewerRef.current();
+      }
+      //   ToolsActions.firstLoad(true);
+      //   LeftMenuActions.setSelectedMenu("");
+      //   setTimeout(() => {
+      //     LeftMenuActions.setSelectedMenu("3d");
+      //   }, 10);
+    }
+  }, []);
+
+  // handleContextRestored'ı ref'e kaydet
+  React.useEffect(() => {
+    handleContextRestoredRef.current = handleContextRestored;
+  }, [handleContextRestored]);
+
+  const handleContextLost = useCallback(async (event: Event) => {
+    if (event && event.preventDefault) {
+      event.preventDefault(); // 🔴 En önemli satır bu
+    }
     // console.warn("WebGL context LOST");
-
+    console.error("❌ WebGL context LOST - PotreeViewer");
     webGLContextLost.current = true; // UI'ı güncelle
     // console.error("Context Lost Gerçekleşti");
     await clear();
@@ -29,46 +82,115 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     oldCanvas?.remove();
 
     setTimeout(() => {
-      handleContextRestored();
+      if (handleContextRestoredRef.current) {
+        handleContextRestoredRef.current();
+      }
     }, 100);
     // viewer.scene.dispose() vs. gibi temizleme yapılabilir
-  };
+  }, [clear]);
 
-  const clear = async () => {
-    await PointCloudService.removePointClouds();
-  };
+  // handleContextLost'u ref'e kaydet
+  React.useEffect(() => {
+    handleContextLostRef.current = handleContextLost;
+  }, [handleContextLost]);
 
-  const handleContextRestored = async () => {
-    // console.log("WebGL context RESTORED");
-
-    webGLContextLost.current = false;
-    if (potreeRenderAreaRef && potreeRenderAreaRef.current) {
-      if (canvasRef.current) {
-        canvasRef.current.removeEventListener(
-          "webglcontextlost",
-          handleContextLost
-        );
-        canvasRef.current.removeEventListener(
-          "webglcontextrestored",
-          handleContextRestored
-        );
+  // loadViewer fonksiyonunu tanımla (handleContextRestored'da ref üzerinden kullanılacak)
+  const loadViewer = useCallback(async () => {
+    try {
+      // Potree'nin yüklü olduğundan emin ol
+      if (typeof window.Potree === "undefined") {
+        console.error("Potree is not loaded yet");
+        return;
       }
-      potreeRenderAreaRef.current.innerHTML = "";
 
-      //   setOrbitControllerKey((prev) => prev + 1);
-      await loadViewer();
-      //   ToolsActions.firstLoad(true);
-      //   LeftMenuActions.setSelectedMenu("");
-      //   setTimeout(() => {
-      //     LeftMenuActions.setSelectedMenu("3d");
-      //   }, 10);
+      // Eğer viewer zaten varsa, tekrar yükleme
+      if (window.viewer) {
+        console.log("Viewer already exists, skipping load");
+        return;
+      }
+
+      const elRenderArea = document.getElementById("potree_render_area");
+      if (!elRenderArea) {
+        console.error("potree_render_area not found");
+        return;
+      }
+
+      // Sidebar container'ın DOM'da olduğundan emin ol
+      const waitForSidebarContainer = (): Promise<void> => {
+        return new Promise((resolve) => {
+          const checkSidebar = () => {
+            const sidebarContainer = document.getElementById(
+              "potree_sidebar_container"
+            );
+            if (sidebarContainer) {
+              resolve();
+            } else {
+              // Eğer container yoksa, bir sonraki render cycle'da tekrar kontrol et
+              requestAnimationFrame(checkSidebar);
+            }
+          };
+          checkSidebar();
+        });
+      };
+
+      await waitForSidebarContainer();
+
+      const viewerArgs = {
+        noDragAndDrop: true,
+        useDefaultRenderLoop: false,
+      };
+      window.pointSizeType = 1;
+      window.viewer = new window.Potree.Viewer(elRenderArea, viewerArgs);
+
+      window.viewer.loadGUI(async () => {
+        if (!window.viewer.profileWindowController) {
+          window.eventBus.emit("heightProfileLoad", {
+            viewer: window.viewer,
+          });
+        }
+
+        const rotgisCanvas = document.getElementById("rotgis-canvas");
+        canvasRef.current = rotgisCanvas ? rotgisCanvas : null;
+        const canvas = canvasRef.current;
+        if (canvas) {
+          if (handleContextLostRef.current) {
+            canvas.addEventListener("webglcontextlost", handleContextLostRef.current, false);
+          }
+          if (handleContextRestoredRef.current) {
+            canvas.addEventListener(
+              "webglcontextrestored",
+              handleContextRestoredRef.current,
+              false
+            );
+          }
+        }
+
+        // Gradient-grid background modunu ekle
+        PotreeBackgroundService.setupGradientGridBackground(window.viewer);
+
+        loadPointCloud(
+          "C:\\Users\\bugra.cimen\\Desktop\\bugra\\rotgis-desktop\\test_data\\metadata.json",
+          "pc"
+        );
+        window.viewer.renderer.setClearColor(0x1f1f1f, 1);
+        // Gradient-grid background'u aktif et
+        window.viewer.setBackground("gradient-grid");
+      });
+    } catch (error) {
+      console.error(error);
+      return;
     }
-  };
+  }, []);
+
+  // loadViewer'ı ref'e kaydet
+  React.useEffect(() => {
+    loadViewerRef.current = loadViewer;
+  }, [loadViewer]);
 
   // Potree'nin yüklenmesini bekle
   useEffect(() => {
     const checkPotreeReady = () => {
-      if (typeof window.Potree !== 'undefined' || (window as any).potreeReady) {
+      if (typeof window.Potree !== "undefined" || (window as any).potreeReady) {
         setIsPotreeReady(true);
         return true;
       }
@@ -85,7 +207,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       setIsPotreeReady(true);
     };
 
-    window.addEventListener('potreeReady', handlePotreeReady);
+    window.addEventListener("potreeReady", handlePotreeReady);
 
     // Polling fallback - eğer event gelmezse kontrol et
     const pollInterval = setInterval(() => {
@@ -98,30 +220,69 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     const timeout = setTimeout(() => {
       clearInterval(pollInterval);
       if (!isPotreeReady) {
-        console.error('❌ Potree yüklenemedi - timeout');
+        console.error("❌ Potree yüklenemedi - timeout");
       }
     }, 10000);
 
     return () => {
-      window.removeEventListener('potreeReady', handlePotreeReady);
+      window.removeEventListener("potreeReady", handlePotreeReady);
       clearInterval(pollInterval);
       clearTimeout(timeout);
     };
   }, [isPotreeReady]);
 
+  // Potree.js'den gelen webglcontextlost event'ini dinle
+  useEffect(() => {
+    const handlePotreeContextLost = (data: any) => {
+      console.log("📢 Potree.js'den webglcontextlost event'i alındı");
+      if (data && data.event) {
+        handleContextLost(data.event);
+      } else {
+        // Event yoksa yeni bir event oluştur
+        const syntheticEvent = new Event('webglcontextlost');
+        handleContextLost(syntheticEvent);
+      }
+    };
+
+    if (window.eventBus) {
+      window.eventBus.on("potree:webglcontextlost", handlePotreeContextLost);
+    }
+
+    return () => {
+      if (window.eventBus) {
+        window.eventBus.off("potree:webglcontextlost", handlePotreeContextLost);
+      }
+    };
+  }, [handleContextLost]);
+
   // Potree hazır olduğunda viewer'ı yükle
+  // display === "block" olduğunda yükle (visibility kontrolü render'da yapılıyor)
+  // Sadece bir kere yüklenecek şekilde kontrol ediliyor
   useEffect(() => {
     if (!isPotreeReady) {
       return;
     }
 
-    const loadPotreeViewer = async () => {
-      await loadViewer();
-    };
+    // Only load viewer if display is block and viewer doesn't exist and hasn't been loaded yet
+    // display prop'u hala kullanılıyor ama render'da visibility kullanılıyor
+    // viewerLoadedRef kontrolü ile viewer'ın sadece 1 kez yüklenmesini garanti ediyoruz
+    if (display === "block" && !window.viewer && !viewerLoadedRef.current) {
+      viewerLoadedRef.current = true; // Flag'i set et, tekrar yüklenmesini önle
+      const loadPotreeViewer = async () => {
+        // loadViewer içinde de window.viewer kontrolü var, ama yine de burada da kontrol ediyoruz
+        if (!window.viewer) {
+          await loadViewer();
+        } else {
+          viewerLoadedRef.current = true; // Viewer zaten varsa flag'i set et
+        }
+      };
 
-    loadPotreeViewer();
+      loadPotreeViewer();
+    }
 
     return () => {
+      // Cleanup sadece component unmount olduğunda yapılmalı
+      // Display değiştiğinde viewer'ı dispose etme, sadece gizle
       if (canvasRef.current) {
         canvasRef.current.removeEventListener(
           "webglcontextlost",
@@ -132,13 +293,8 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
           handleContextRestored
         );
       }
-      clear();
-      window.viewer?.renderer?.dispose();
-      window.viewer?.scene?.scene?.dispose();
-      const oldCanvas = window.viewer?.renderer?.domElement;
-      oldCanvas?.remove();
     };
-  }, [isPotreeReady]);
+  }, [isPotreeReady, display]);
 
   useEffect(() => {
     const handleMouseDown = (event: any) => {
@@ -169,150 +325,63 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     }
   }, [display]);
 
-  const loadViewer = async () => {
-    try {
-      // Potree'nin yüklü olduğundan emin ol
-      if (typeof window.Potree === 'undefined') {
-        console.error('Potree is not loaded yet');
-        return;
-      }
-
-      if (window.viewer) {
-        window.viewer = null;
-      }
-      const elRenderArea = document.getElementById("potree_render_area");
-
-      // Sidebar container'ın DOM'da olduğundan emin ol
-      const waitForSidebarContainer = (): Promise<void> => {
-        return new Promise((resolve) => {
-          const checkSidebar = () => {
-            const sidebarContainer = document.getElementById(
-              "potree_sidebar_container"
-            );
-            if (sidebarContainer) {
-              resolve();
-            } else {
-              // Eğer container yoksa, bir sonraki render cycle'da tekrar kontrol et
-              requestAnimationFrame(checkSidebar);
-            }
-          };
-          checkSidebar();
-        });
-      };
-
-      await waitForSidebarContainer();
-
-      const viewerArgs = {
-        noDragAndDrop: true,
-        useDefaultRenderLoop: false,
-      };
-      window.pointSizeType = 1;
-      window.viewer = new window.Potree.Viewer(elRenderArea, viewerArgs);
-      
-
-    //   window.viewer.renderer.setClearColor(0x1f1f1f, 1);
-      // window.viewer.setEDLEnabled(true);
-      // window.viewer.setFOV(60);
-      // window.viewer.setPointBudget(5 * 1000 * 1000);
-      // window.viewer.setMinNodeSize(0);
-      // window.viewer.loadSettingsFromURL();
-      // window.viewer.setDescription("");
-
-      window.viewer.loadGUI(async () => {
-        // await loadViewerContainer();
-        // window.viewer.setLanguage('en');
-        // window.viewer.toggleSidebar();
-        if (!window.viewer.profileWindowController) {
-          window.eventBus.emit("heightProfileLoad", {
-            viewer: window.viewer,
-          });
-        }
-        // window.viewer?.addEventListener("update", CadGeneralManager.update);
-
-        const rotgisCanvas = document.getElementById("rotgis-canvas");
-        canvasRef.current = rotgisCanvas ? rotgisCanvas : null;
-        const canvas = canvasRef.current;
-        if (canvas) {
-          canvas.addEventListener("webglcontextlost", handleContextLost, false);
-          canvas.addEventListener(
-            "webglcontextrestored",
-            handleContextRestored,
-            false
-          );
-        }
-
-        // Gradient-grid background modunu ekle
-        PotreeBackgroundService.setupGradientGridBackground(window.viewer);
-
-        // const exist = fs.existsSync("C:\\Users\\bugra.cimen\\Desktop\\bugra\\rotgis-desktop\\test_data\\metadata.json");
-        loadPointCloud("C:\\Users\\bugra.cimen\\Desktop\\bugra\\rotgis-desktop\\test_data\\metadata.json", "pc");
-        window.viewer.renderer.setClearColor(0x1f1f1f, 1);
-        // Gradient-grid background'u aktif et
-        window.viewer.setBackground("gradient-grid");
-      
-      });
-    } catch (error) {
-      console.error(error);
-      return;
-    }
-  };
-
   const loadPointCloud = (pointCloudPath: string, id: string) => {
-      window.Potree.loadPointCloud(pointCloudPath, id, (e: any) => {
-          window.viewer.scene.addPointCloud(e.pointcloud);
-          //e.pointcloud.position.z = 0;
-          const material = e.pointcloud.material;
-          material.size = 1;
-          // material.pointSizeType = window.Potree.PointSizeType.ATTENUATED;
-          // material.pointSizeType = window.Potree.PointSizeType.ADAPTIVE;
-        //   material.heightMin = pointCloud.properties.bbox.min.z;
-        //   material.heightMax = pointCloud.properties.bbox.max.z;
-          material.pointSizeType = window.pointSizeType;
-          //PointCloudManager.setPointBudget(5000000);
-          PotreeService.setNodeSize(30);
-          material.coloringType = 0;
-          material.gradientValue = "SPECTRAL";
-          window.viewer.setControls(window.viewer.earthControls);
+    window.Potree.loadPointCloud(pointCloudPath, id, (e: any) => {
+      window.viewer.scene.addPointCloud(e.pointcloud);
+      //e.pointcloud.position.z = 0;
+      const material = e.pointcloud.material;
+      material.size = 1;
+      // material.pointSizeType = window.Potree.PointSizeType.ATTENUATED;
+      // material.pointSizeType = window.Potree.PointSizeType.ADAPTIVE;
+      //   material.heightMin = pointCloud.properties.bbox.min.z;
+      //   material.heightMax = pointCloud.properties.bbox.max.z;
+      material.pointSizeType = window.pointSizeType;
+      //PointCloudManager.setPointBudget(5000000);
+      PotreeService.setNodeSize(30);
+      material.coloringType = 0;
+      material.gradientValue = "SPECTRAL";
+      window.viewer.setControls(window.viewer.earthControls);
 
-          window.viewer.zoomTo(e.pointcloud, 1.2);
-          
-          // Camera rotation tracking'i başlat
-          setupCameraRotationTracking(window.viewer);
+      window.viewer.zoomTo(e.pointcloud, 1.2);
 
-        //   PotreeService.zoomToBBox("pc");
-        });
-    };
+      // Camera rotation tracking'i başlat
+      setupCameraRotationTracking(window.viewer);
+
+      //   PotreeService.zoomToBBox("pc");
+    });
+  };
 
   // Camera rotation değişikliğini takip et ve EventEmitter ile ilet
   const setupCameraRotationTracking = (viewer: any) => {
     if (!viewer || !viewer.scene) return;
-    
+
     let lastYaw: number | null = null;
     const THRESHOLD = 0.01; // 0.01 radyan (~0.57 derece) eşik değeri - performans için
-    
+
     const checkRotationChange = () => {
       try {
         if (!viewer.scene || !viewer.scene.view) return;
-        
+
         const view = viewer.scene.view;
-        if (typeof view.yaw !== 'undefined') {
+        if (typeof view.yaw !== "undefined") {
           // Sadece belirli bir eşik değerinden fazla değiştiyse emit et
           if (lastYaw === null || Math.abs(view.yaw - lastYaw) > THRESHOLD) {
             lastYaw = view.yaw;
-            
+
             // Yaw'ı dereceye çevir (0-360 arası)
             let yawDegrees = (view.yaw * 180) / Math.PI;
             yawDegrees = yawDegrees % 360;
             if (yawDegrees < 0) yawDegrees += 360;
-            
+
             // Pitch'i dereceye çevir
-            const pitchDegrees = typeof view.pitch !== 'undefined' 
-              ? (view.pitch * 180) / Math.PI 
-              : 0;
-            
+            const pitchDegrees =
+              typeof view.pitch !== "undefined"
+                ? (view.pitch * 180) / Math.PI
+                : 0;
+
             // EventEmitter'a emit et (hem yaw hem pitch)
             if (window.eventBus) {
-              window.eventBus.emit('camera-rotation-changed', { 
+              window.eventBus.emit("camera-rotation-changed", {
                 yaw: yawDegrees,
                 pitch: pitchDegrees,
               });
@@ -323,16 +392,20 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         // Hata durumunda sessizce devam et
       }
     };
-    
+
     // Potree'nin update event'ini dinle
-    viewer.addEventListener('update', checkRotationChange);
+    viewer.addEventListener("update", checkRotationChange);
   };
 
   const potreeOnMouseMove = async (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isMouseWheelHeld && !isObjectMoving) {
-      if (window.viewer && window.viewer.scene && window.viewer.scene.pointclouds) {
+      if (
+        window.viewer &&
+        window.viewer.scene &&
+        window.viewer.scene.pointclouds
+      ) {
         const pointCloudsArray = window.viewer.scene.pointclouds;
-        
+
         // Point cloud kontrolü - eğer pointclouds boşsa işlemi sonlandır
         if (!pointCloudsArray || pointCloudsArray.length === 0) {
           StatusBarActions.clearCoords();
@@ -341,18 +414,18 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
 
         // Native event'i kullanarak daha hassas koordinat hesaplama
         const nativeEvent = event.nativeEvent;
-        
+
         // getMousePointCloudIntersection bir array bekliyor, bu yüzden tüm pointclouds array'ini gönderiyoruz
         const resultPc = await PointCloudService.mouseCoordListener(
           nativeEvent,
           pointCloudsArray
         );
-        
+
         if (resultPc.point.position.x == -1) {
           StatusBarActions.clearCoords();
           return;
         }
-        
+
         // Daha hassas koordinat gösterimi (3 ondalık basamak)
         StatusBarActions.setCoordinates(
           Number(resultPc.point.position.x.toFixed(3)),
@@ -366,77 +439,118 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   // Potree hazır olana kadar loading göster
   if (!isPotreeReady) {
     return (
-      <div id="viewerContainer" style={{display:"flex", margin:0, padding:0, width:"100%", height:"100%", position: "relative", alignItems: "center", justifyContent: "center"}}>
-        <div style={{color: "#fff", fontSize: "16px"}}>Viewer Loading</div>
+      <div
+        id="viewerContainer"
+        style={{
+          display: "flex",
+          margin: 0,
+          padding: 0,
+          width: "100%",
+          height: "100%",
+          position: "relative",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div style={{ color: "#fff", fontSize: "16px" }}>Viewer Loading</div>
       </div>
     );
   }
 
+  // display: none yerine visibility ve opacity kullan (WebGL context kaybını önlemek için)
+  // Viewer.tsx'de visibility kontrolü yapılıyor, burada her zaman visible olmalı
+  const isVisible = display === "block";
+  
   return (
-    <div id="viewerContainer" style={{display:"flex", margin:0, padding:0, zIndex: 9994, width:"100%", height:"100%", position: "relative"}}>
-      {/* 3D FPS Meter - Sağ üst köşe */}
+    <div
+      id="main-potree"
+      style={{
+        visibility: "visible", // Viewer.tsx'de kontrol ediliyor
+        opacity: 1, // Viewer.tsx'de kontrol ediliyor
+        pointerEvents: "auto", // Viewer.tsx wrapper'da kontrol ediliyor, burada her zaman auto
+        width: "100%",
+        height: "100%",
+        transition: "opacity 0.2s",
+      }}
+    >
       <div
+        id="viewerContainer"
         style={{
-          position: "absolute",
-          top: "10px",
-          right: "10px",
-          zIndex: 10000,
-          pointerEvents: "none",
-          display: "flex",
-          flexDirection: "column",
-          gap: "10px",
-          alignItems: "flex-end",
-        }}
-      >
-        <Compass className="pointer-events-auto" />
-        <FPSMeter className="pointer-events-auto" />
-      </div>
-      
-      {/* Orbit Controller - Sol alt köşe */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: "10px",
-          left: "10px",
-          zIndex: 10000,
-          pointerEvents: "auto",
-        }}
-      >
-        <OrbitController />
-      </div>
-      
-      <div
-        id="potree_container"
-        style={{
+          display: "block",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: 0,
+          padding: 0,
           width: "100%",
-          marginTop: "0px",
-          //   height: `calc(100% - (${multiTabScreen.show ? "0px" : "0px"}))`,
           height: "100%",
-          zIndex: 9994,
+          position: "relative",
+          pointerEvents: "auto", // Viewer.tsx wrapper'da kontrol ediliyor, burada her zaman auto
         }}
       >
+        {/* 3D FPS Meter - Sağ üst köşe */}
         <div
-          id="potree_render_area"
-          onMouseMove={potreeOnMouseMove}
           style={{
-            width: "100%",
-            // height: `calc(100% - (${
-            //   multiTabScreen.show ? "300px" : "0px"
-            // }))`,
-            height: "100%",
-          }}
-          ref={potreeRenderAreaRef}
-        ></div>
-        <div
-          id="potree_sidebar_container"
-          style={{
-            width: "100%",
-            // height: `calc(100% - (${
-            //   multiTabScreen.show ? "300px" : "0px"
-            // }))`,
-            height: "100%",
+            position: "absolute",
+            top: "10px",
+            right: "10px",
+            zIndex: 50, // Viewer içindeki UI elementleri
+            pointerEvents: "none", // Container pointer events'i engellemez
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+            alignItems: "flex-end",
           }}
         >
+          <Compass className="pointer-events-auto" />
+          <FPSMeter className="pointer-events-auto" />
+        </div>
+
+        {/* Orbit Controller - Sol alt köşe */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: "10px",
+            left: "10px",
+            zIndex: 50, // Viewer içindeki UI elementleri
+            pointerEvents: "auto", // OrbitController çalışmalı
+          }}
+        >
+          <OrbitController />
+        </div>
+
+        <div
+          id="potree_container"
+          style={{
+            width: "100%",
+            marginTop: "0px",
+            height: "100%",
+            minWidth: "200px",
+            minHeight: "200px",
+            pointerEvents: "auto", // Viewer.tsx wrapper'da kontrol ediliyor, burada her zaman auto
+          }}
+        >
+          <div
+            id="potree_render_area"
+            onMouseMove={potreeOnMouseMove}
+            style={{
+              width: "100%",
+              height: "100%",
+              minWidth: "200px",
+              minHeight: "200px",
+              pointerEvents: "auto", // Canvas etkileşimleri için
+            }}
+            ref={potreeRenderAreaRef}
+          ></div>
+          <div
+            id="potree_sidebar_container"
+            style={{
+              width: "100%",
+              // height: `calc(100% - (${
+              //   multiTabScreen.show ? "300px" : "0px"
+              // }))`,
+              height: "100%",
+            }}
+          ></div>
         </div>
       </div>
     </div>

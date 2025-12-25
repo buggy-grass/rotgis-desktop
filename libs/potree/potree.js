@@ -24086,6 +24086,12 @@
 
 			_isContextLost = true;
 
+			// EventEmitter ile PotreeViewer'daki restore komutunu tetikle
+			// if (window.eventBus && typeof window.eventBus.emit === 'function') {
+			console.log("context");
+				window.eventBus.emit('potree:webglcontextlost', { event: event });
+			// }
+
 		}
 
 		function onContextRestore( /* event */ ) {

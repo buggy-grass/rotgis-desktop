@@ -110,9 +110,8 @@ export function WindowCustomBar() {
 
   return (
     <div className="h-8 bg-background border-b border-border flex items-center justify-between select-none drag-region" style={{ zIndex: 10001, position: "relative" }}>
-      {/* Sol taraf - Uygulama ismi */}
+      {/* Sol taraf - WindowMenu */}
       <div className="flex items-center gap-2 px-4 no-drag">
-        {/* <span className="text-xs font-medium text-foreground">{appName}</span> */}
         <WindowMenu />
       </div>
 

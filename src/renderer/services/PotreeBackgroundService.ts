@@ -13,6 +13,11 @@ class PotreeBackgroundService {
       return;
     }
 
+    // Eğer zaten setup edilmişse, tekrar setup etme
+    if (viewer.scene.sceneBG && viewer.scene.sceneBG.getObjectByName('gradient_skybox')) {
+      return; // Zaten setup edilmiş, tekrar yapma
+    }
+
     const THREE = (window as any).THREE;
     if (!THREE) {
       console.warn('THREE.js bulunamadı');

@@ -1,6 +1,6 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { WindowCustomBar } from "../WindowCustomBar";
-import PotreeViewer from "../viewer/PotreeViewer";
+import Viewer from "../viewer/Viewer";
 import HeightProfileViewer from "../viewer/HeightProfileViewer";
 import StatusBar from "../StatusBar";
 import RibbonMenu from "../menu/RibbonMenu";
@@ -11,6 +11,7 @@ import {
   ResizableHandle,
 } from "../ui/resizable";
 
+type ViewMode = "3d" | "2d" | "split-horizontal";
 
 const useStyles = {
   container: {},
@@ -18,7 +19,7 @@ const useStyles = {
 
 function Main() {
   const styles = useStyles;
-  const [viewer, setViewer] = React.useState<any>(true);
+  const [viewMode, setViewMode] = useState<ViewMode>("3d");
 
   useEffect(() => {
     console.error("loaded", window.viewer);
@@ -47,13 +48,13 @@ function Main() {
         <ResizablePanel defaultSize={75} minSize={30}>
           <div
             style={{
-              height: "calc(100vh - 183px)",
+              height: "calc(100vh - 234px)",
               width: "100%",
               position: "relative",
             }}
           >
-            {viewer && <PotreeViewer display="block" />}
-            {<HeightProfileViewer display="none" />}
+            <Viewer viewMode={viewMode} onViewModeChange={setViewMode} />
+            <HeightProfileViewer display="none" />
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
