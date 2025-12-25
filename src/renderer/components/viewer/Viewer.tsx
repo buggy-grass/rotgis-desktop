@@ -2,7 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import PotreeViewer from "./PotreeViewer";
 import OpenLayersViewer from "./OpenLayersViewer";
 import { Button } from "../ui/button";
-import { Box, Columns2, LayoutGrid, Split, SquareSplitHorizontal } from "lucide-react";
+import {
+  Box,
+  Columns2,
+  LayoutGrid,
+  Split,
+  SquareSplitHorizontal,
+} from "lucide-react";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -40,11 +46,11 @@ const Viewer: React.FC<ViewerProps> = ({
 
   // Split modunda panel boyutlarını takip et ve viewer'ları güncelle
   const potreePanelRef = useRef<HTMLDivElement>(null);
-  
+
   useEffect(() => {
     if (viewMode === "split-horizontal" && potreePanelRef.current) {
       let resizeTimeout: NodeJS.Timeout;
-      
+
       // Potree panel'i için ResizeObserver - canvas boyutunu güncelle
       const potreeResizeObserver = new ResizeObserver((entries) => {
         // Debounce - çok sık güncelleme yapmayı önle
@@ -53,20 +59,31 @@ const Viewer: React.FC<ViewerProps> = ({
           for (const entry of entries) {
             const { width, height } = entry.contentRect;
             // Minimum boyut kontrolü - canvas 0x0 olmamalı
-            if (width >= 200 && height >= 200 && window.viewer && window.viewer.renderer) {
+            if (
+              width >= 200 &&
+              height >= 200 &&
+              window.viewer &&
+              window.viewer.renderer
+            ) {
               const canvas = window.viewer.renderer.domElement;
               if (canvas) {
                 // Canvas'ın gerçek boyutunu al
                 const rect = canvas.getBoundingClientRect();
                 const actualWidth = Math.floor(rect.width);
                 const actualHeight = Math.floor(rect.height);
-                
+
                 // Sadece geçerli boyutlarda güncelle
                 if (actualWidth >= 200 && actualHeight >= 200) {
                   // Mevcut boyutla aynı değilse güncelle
-                  if (window.viewer.renderer.getSize().width !== actualWidth || 
-                      window.viewer.renderer.getSize().height !== actualHeight) {
-                    window.viewer.renderer.setSize(actualWidth, actualHeight, false);
+                  if (
+                    window.viewer.renderer.getSize().width !== actualWidth ||
+                    window.viewer.renderer.getSize().height !== actualHeight
+                  ) {
+                    window.viewer.renderer.setSize(
+                      actualWidth,
+                      actualHeight,
+                      false
+                    );
                     window.viewer.update();
                   }
                 }
@@ -106,17 +123,25 @@ const Viewer: React.FC<ViewerProps> = ({
           left: 0,
           right: 0,
           pointerEvents: "auto", // Butonlar çalışmalı
-          height: "32px",
-          
+          height: "20px",
         }}
       >
         {/* Sol taraf - Viewer Mode butonları */}
-        <div className="flex items-center" style={{display:"flex", justifyContent: "flex-end", width: "100%",}}>
+        <div
+          className="flex items-center"
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            width: "100%",
+            height: "100%",
+            background: "#262626",
+          }}
+        >
           <div className="flex items-center gap-2 mr-2">
             <Button
               variant={viewMode === "3d" ? "default" : "ghost"}
               size="sm"
-              className="h-6 px-2 text-xs"
+              className="h-4 px-2 text-xs"
               onClick={() => handleViewModeChange("3d")}
             >
               <span>3D</span>
@@ -124,7 +149,7 @@ const Viewer: React.FC<ViewerProps> = ({
             <Button
               variant={viewMode === "2d" ? "default" : "ghost"}
               size="sm"
-              className="h-6 px-2 text-xs"
+              className="h-4 px-2 text-xs"
               onClick={() => handleViewModeChange("2d")}
             >
               <span>2D</span>
@@ -132,7 +157,7 @@ const Viewer: React.FC<ViewerProps> = ({
             <Button
               variant={viewMode === "split-horizontal" ? "default" : "ghost"}
               size="sm"
-              className="h-6 px-2 text-s"
+              className="h-4 px-2 text-xs"
               onClick={() => handleViewModeChange("split-horizontal")}
             >
               <Columns2 className="h-3 w-3" />
@@ -145,12 +170,10 @@ const Viewer: React.FC<ViewerProps> = ({
       <div
         style={{
           width: "100%",
-          height: "100%",
+          height: "calc(100% - 20px)",
           position: "relative",
-          paddingTop: "32px", // Bar yüksekliği - viewer'lar bar'ın altında başlamalı
         }}
       >
-
         {/* 3D Viewer - Her zaman render edilir, CSS ile pozisyon ve görünürlük kontrol edilir */}
         <div
           ref={potreePanelRef}
@@ -183,7 +206,11 @@ const Viewer: React.FC<ViewerProps> = ({
             visibility: is2DVisible ? "visible" : "hidden",
             opacity: is2DVisible ? 1 : 0,
             pointerEvents: is2DVisible ? "auto" : "none",
-            display: is3DVisible ? viewMode == "split-horizontal" ? "block" : "none" : "block",
+            display: is3DVisible
+              ? viewMode == "split-horizontal"
+                ? "block"
+                : "none"
+              : "block",
             transition: "opacity 0.4s ease-in-out",
             minWidth: "200px",
             minHeight: "200px",
@@ -215,13 +242,13 @@ const Viewer: React.FC<ViewerProps> = ({
                 }}
               />
             </ResizablePanel>
-            <ResizableHandle 
-              withHandle 
-              style={{ 
+            <ResizableHandle
+              withHandle
+              style={{
                 pointerEvents: "auto", // Handle çalışmalı
                 zIndex: 20, // Handle en üstte
                 position: "relative", // Handle'ın doğru çalışması için
-              }} 
+              }}
             />
             <ResizablePanel defaultSize={50} minSize={20}>
               <div
@@ -240,4 +267,3 @@ const Viewer: React.FC<ViewerProps> = ({
 };
 
 export default Viewer;
-

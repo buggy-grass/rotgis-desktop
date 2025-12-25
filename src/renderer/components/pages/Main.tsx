@@ -4,7 +4,7 @@ import Viewer from "../viewer/Viewer";
 import HeightProfileViewer from "../viewer/HeightProfileViewer";
 import StatusBar from "../StatusBar";
 import RibbonMenu from "../menu/RibbonMenu";
-import Tools from "../tools/ToolBox";
+import Toolbox from "../tools/ToolBox";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -32,7 +32,7 @@ function Main() {
       <ResizablePanelGroup
         direction="horizontal"
         style={{
-          height: "calc(100vh - 202px)",
+          height: "calc(100vh - 204px)",
           width: "100vw",
         }}
       >
@@ -42,13 +42,13 @@ function Main() {
           maxSize={325}
           style={{ minWidth: "262px", maxWidth: "325px" }}
         >
-          <Tools />
+          <Toolbox />
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={75} minSize={30}>
           <div
             style={{
-              height: "calc(100vh - 234px)",
+              height: "100%",
               width: "100%",
               position: "relative",
             }}
