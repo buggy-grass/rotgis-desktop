@@ -18,5 +18,12 @@ class StatusBarActions {
       type: "STATUS_BAR/CLEAR_COORDS",
     });
   }
+
+  static setOperation(name: string, icon?: string) {
+    store.dispatch({
+      type: "STATUS_BAR/SET_OPERATION",
+      payload: { name, icon },
+    });
+  }
 }
 export default StatusBarActions;

@@ -14,6 +14,7 @@ export function WindowCustomBar() {
   const appName = useSelector((state: RootState) => state.appReducer.appName);
   const projectState = useSelector((state: RootState) => state.projectReducer);
   const projectName = projectState.project?.project.name || "Untitled Project";
+  const isDirty = projectState.isDirty;
 
   // Electron API'nin hazır olmasını bekle
   useEffect(() => {
@@ -117,7 +118,10 @@ export function WindowCustomBar() {
 
       {/* Orta - Proje ismi (drag region) */}
       <div className="flex-1 flex items-center justify-center drag-region">
-        <span className="text-xs font-semibold text-foreground pointer-events-none">{projectName}</span>
+        <span className="text-xs font-semibold text-foreground pointer-events-none">
+          {projectName}
+          {isDirty && <span className="ml-1 text-muted-foreground">*</span>}
+        </span>
       </div>
 
       {/* Sağ taraf - Window kontrol butonları */}

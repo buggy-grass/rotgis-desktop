@@ -36,6 +36,20 @@ import ProjectActions from '../../store/actions/ProjectActions';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store/store';
 import { manualSaveProject } from '../../services/ProjectAutoSave';
+import StatusBarActions from '../../store/actions/StatusBarActions';
+
+// Helper function to get icon name from LucideIcon component
+const getIconName = (icon: LucideIcon): string => {
+  // Try to get name from component
+  const name = (icon as any).name || (icon as any).displayName;
+  if (name) return name;
+  
+  // Fallback: try to extract from toString or function name
+  const funcName = icon.toString().match(/function\s+(\w+)/)?.[1];
+  if (funcName) return funcName;
+  
+  return "Ruler"; // Default fallback
+};
 
 const useStyles = makeUseStyles({
   container: {
@@ -57,20 +71,9 @@ const useStyles = makeUseStyles({
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-start",
-    gap: "4px",
-    padding: "6px 8px",
-    minHeight: "70px",
-  },
-  buttonGroupTitle: {
-    fontSize: "10px",
-    color: "var(--muted-foreground)",
-    textAlign: "center",
-    padding: "2px 0",
-    width: "100%",
-    borderBottom: "1px solid var(--border)",
-    marginBottom: "4px",
-    fontWeight: 500,
-    transition: "color 0.2s ease-in-out",
+    gap: "2px",
+    padding: "4px 6px",
+    minHeight: "60px",
   },
 });
 
@@ -82,6 +85,7 @@ interface RibbonGroup {
     onClick?: () => void;
     variant?: "default" | "ghost" | "outline";
     size?: "sm" | "default" | "lg";
+    toggle?: boolean;
   }[];
 }
 
@@ -96,6 +100,7 @@ function RibbonMenu() {
   const styles = useStyles();
   const [activeTab, setActiveTab] = useState("measurement");
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [activeButtons, setActiveButtons] = useState<Record<string, boolean>>({});
   
   // Get project from store
   const projectState = useSelector((state: RootState) => state.projectReducer);
@@ -164,9 +169,9 @@ function RibbonMenu() {
         {
           title: "Tools",
           buttons: [
-            { label: "Distance", icon: RulerIcon, variant: "default" },
-            { label: "Area", icon: Grid3x3, variant: "ghost" },
-            { label: "Volume", icon: Box, variant: "ghost" },
+            { label: "Distance", icon: RulerIcon, variant: "ghost", toggle: true },
+            { label: "Area", icon: Grid3x3, variant: "ghost", toggle: true },
+            { label: "Volume", icon: Box, variant: "ghost", toggle: true },
           ],
         },
         {
@@ -186,16 +191,16 @@ function RibbonMenu() {
         {
           title: "Draw",
           buttons: [
-            { label: "Line", icon: Pencil, variant: "default" },
-            { label: "Polygon", icon: Grid3x3, variant: "ghost" },
-            { label: "Circle", icon: RotateCw, variant: "ghost" },
+            { label: "Line", icon: Pencil, variant: "ghost", toggle: true },
+            { label: "Polygon", icon: Grid3x3, variant: "ghost", toggle: true },
+            { label: "Circle", icon: RotateCw, variant: "ghost", toggle: true },
           ],
         },
         {
           title: "Edit",
           buttons: [
-            { label: "Move", icon: Move, variant: "ghost" },
-            { label: "Rotate", icon: RotateCw, variant: "ghost" },
+            { label: "Move", icon: Move, variant: "ghost", toggle: true },
+            { label: "Rotate", icon: RotateCw, variant: "ghost", toggle: true },
             { label: "Delete", icon: RotateCw, variant: "ghost" },
           ],
         },
@@ -296,20 +301,65 @@ function RibbonMenu() {
               style={styles.buttonGroup}
               className="ribbon-button-group"
             >
-              <div style={styles.buttonGroupTitle}>{group.title}</div>
-              <div className="flex items-center gap-1 flex-wrap">
+              <div className="grid grid-cols-2 gap-1">
                 {group.buttons.map((button, buttonIndex) => {
                   const IconComponent = button.icon;
+                  const buttonKey = `${tab.value}-${groupIndex}-${buttonIndex}`;
+                  const isActive = activeButtons[buttonKey] || false;
+                  const isToggle = button.toggle && (tab.value === "measurement" || tab.value === "drawing");
+                  
+                  const handleClick = () => {
+                    if (isToggle) {
+                      // Toggle button state
+                      const newState = !isActive;
+                      
+                      // If activating this button, deactivate all other buttons in the same group
+                      if (newState) {
+                        setActiveButtons(prev => {
+                          const newState = { ...prev };
+                          // Deactivate all buttons in the same group
+                          group.buttons.forEach((_, idx) => {
+                            const otherButtonKey = `${tab.value}-${groupIndex}-${idx}`;
+                            if (otherButtonKey !== buttonKey) {
+                              newState[otherButtonKey] = false;
+                            }
+                          });
+                          // Activate current button
+                          newState[buttonKey] = true;
+                          return newState;
+                        });
+                        
+                        // Update StatusBar
+                        const iconName = getIconName(button.icon);
+                        StatusBarActions.setOperation(button.label, iconName);
+                      } else {
+                        // Deactivate current button
+                        setActiveButtons(prev => ({
+                          ...prev,
+                          [buttonKey]: false,
+                        }));
+                        
+                        // Update StatusBar to Ready
+                        StatusBarActions.setOperation("Ready");
+                      }
+                    }
+                    
+                    // Call original onClick if provided
+                    if (button.onClick) {
+                      button.onClick();
+                    }
+                  };
+                  
                   return (
                     <Button
                       key={buttonIndex}
-                      variant={button.variant || "ghost"}
+                      variant={isActive && isToggle ? "default" : (button.variant || "ghost")}
                       size={button.size || "sm"}
-                      className="h-12 w-12 px-1 py-1.5 text-xs flex flex-col items-center justify-center gap-1 hover:bg-accent transition-colors duration-150"
-                      onClick={button.onClick}
+                      className="h-auto w-auto min-h-[48px] min-w-[48px] max-w-[48px] px-1 py-1 text-xs flex flex-col items-center justify-center gap-0.5 hover:bg-accent transition-colors duration-150 aspect-square"
+                      onClick={handleClick}
                     >
-                      <IconComponent className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span className="text-[10px] leading-tight text-center whitespace-normal break-words">{button.label}</span>
+                      <IconComponent className="h-3 w-3 flex-shrink-0" />
+                      <span className="text-[9px] leading-tight text-center whitespace-normal break-words line-clamp-2">{button.label}</span>
                     </Button>
                   );
                 })}

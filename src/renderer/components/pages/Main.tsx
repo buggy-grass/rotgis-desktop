@@ -31,7 +31,7 @@ function Main() {
       <ResizablePanelGroup
         direction="horizontal"
         style={{
-          height: "calc(100vh - 183px)",
+          height: "calc(100vh - 202px)",
           width: "100vw",
         }}
       >

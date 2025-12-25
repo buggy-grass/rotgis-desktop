@@ -8,6 +8,10 @@ const initialState: IStatusBar = {
     y: 0,
     z: 0,
   },
+  operation: {
+    name: "Ready",
+    icon: undefined,
+  },
 };
 
 const StatusBarReducer: Reducer<IStatusBar, IActionsProps> = (
@@ -31,6 +35,14 @@ const StatusBarReducer: Reducer<IStatusBar, IActionsProps> = (
           x: 0,
           y: 0,
           z: 0,
+        },
+      };
+    case "STATUS_BAR/SET_OPERATION":
+      return {
+        ...state,
+        operation: {
+          name: action.payload.name,
+          icon: action.payload.icon,
         },
       };
     case "STATUS_BAR/GET_STATUS_BAR_STATE":
