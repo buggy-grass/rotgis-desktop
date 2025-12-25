@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { makeUseStyles } from '../../styles/makeUseStyles';
 import { Button } from "../ui/button";
 import {
@@ -30,6 +30,12 @@ import {
   EyeOff,
   LucideIcon,
 } from "lucide-react";
+import { SaveProjectDialog } from '../dialogs/SaveProjectDialog';
+import ProjectService from '../../services/ProjectService';
+import ProjectActions from '../../store/actions/ProjectActions';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store/store';
+import { manualSaveProject } from '../../services/ProjectAutoSave';
 
 const useStyles = makeUseStyles({
   container: {
@@ -89,6 +95,65 @@ interface RibbonTab {
 function RibbonMenu() {
   const styles = useStyles();
   const [activeTab, setActiveTab] = useState("measurement");
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  
+  // Get project from store
+  const projectState = useSelector((state: RootState) => state.projectReducer);
+  const currentProject = projectState.project;
+
+  // CTRL+S keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = async (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault();
+        
+        // If project is already saved, just save it
+        if (projectState.projectFilePath && projectState.project) {
+          try {
+            await manualSaveProject();
+          } catch (error) {
+            console.error('Error saving project:', error);
+            // If save fails, open dialog
+            setShowSaveDialog(true);
+          }
+        } else {
+          // Project not saved yet, open dialog
+          setShowSaveDialog(true);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [projectState.projectFilePath, projectState.project]);
+
+  const handleSaveProject = async (projectName: string, savePath: string, epsg: number) => {
+    if (!currentProject) {
+      throw new Error('No project to save');
+    }
+
+    try {
+      // Update project name
+      currentProject.project.name = projectName;
+      
+      // Update project EPSG
+      currentProject.project.outcoordsys.epsg.code = epsg;
+      
+      // Save project
+      const result = await ProjectService.save(currentProject, savePath);
+      console.log('Project saved:', result);
+      
+      // Update project in store
+      ProjectActions.updateProject(currentProject);
+      ProjectActions.setProjectPaths(result.projectFile, result.projectFolder);
+      ProjectActions.setDirty(false);
+    } catch (error) {
+      console.error('Error saving project:', error);
+      throw error;
+    }
+  };
 
   const ribbonTabs: RibbonTab[] = [
     {
@@ -257,7 +322,14 @@ function RibbonMenu() {
   };
 
   return (
-    <div className="border-b border-border" style={styles.container}>
+    <>
+      <SaveProjectDialog
+        open={showSaveDialog}
+        onOpenChange={setShowSaveDialog}
+        projectName={currentProject?.project.name || "Untitled Project"}
+        onSave={handleSaveProject}
+      />
+      <div className="border-b border-border" style={styles.container}>
       <style>{`
         @keyframes fadeIn {
           from {
@@ -305,6 +377,7 @@ function RibbonMenu() {
         ))}
       </Tabs>
     </div>
+    </>
   );
 }
 

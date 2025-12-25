@@ -12,7 +12,8 @@ export function WindowCustomBar() {
   
   // Store'dan veri al
   const appName = useSelector((state: RootState) => state.appReducer.appName);
-  const projectName = useSelector((state: RootState) => state.appReducer.projectName);
+  const projectState = useSelector((state: RootState) => state.projectReducer);
+  const projectName = projectState.project?.project.name || "Untitled Project";
 
   // Electron API'nin hazır olmasını bekle
   useEffect(() => {

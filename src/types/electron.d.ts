@@ -17,6 +17,12 @@ export interface ElectronAPI {
   readDirectory: (dirPath: string) => Promise<FileSystemItem[]>;
   deleteFile: (filePath: string) => Promise<void>;
   openInExplorer: (filePath: string) => Promise<void>;
+  readProjectXML: (filePath: string) => Promise<string>;
+  writeProjectXML: (filePath: string, content: string) => Promise<void>;
+  createProjectDirectory: (dirPath: string) => Promise<void>;
+  showFolderPicker: (options?: { defaultPath?: string }) => Promise<string | null>;
+  showProjectFilePicker: (options?: { defaultPath?: string }) => Promise<string | null>;
+  directoryExists: (dirPath: string) => Promise<boolean>;
 }
 
 declare global {

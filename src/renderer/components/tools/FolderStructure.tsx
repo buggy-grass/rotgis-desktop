@@ -20,9 +20,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
-import { Folder, File, ChevronRight, FolderOpen, Trash2, ExternalLink, AlertTriangle } from 'lucide-react';
+import { 
+  Folder, 
+  File, 
+  Trash2, 
+  ExternalLink, 
+  AlertTriangle, 
+  FileText,
+  Image,
+  FileCode,
+  FileJson,
+  FileVideo,
+  FileAudio,
+  FileArchive,
+  FileSpreadsheet,
+  FileCheck,
+  Database,
+  Package,
+  Settings,
+  Globe
+} from 'lucide-react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store/store';
 
 interface FileSystemItem {
   name: string;
@@ -35,15 +56,139 @@ interface FolderStructureProps {
   rootPath?: string;
 }
 
+// File type icon mapping
+const fileTypeIcons: Record<string, { icon: React.ComponentType<any>; color: string }> = {
+  // Images
+  'jpg': { icon: Image, color: 'text-blue-400' },
+  'jpeg': { icon: Image, color: 'text-blue-400' },
+  'png': { icon: Image, color: 'text-blue-400' },
+  'gif': { icon: Image, color: 'text-blue-400' },
+  'bmp': { icon: Image, color: 'text-blue-400' },
+  'svg': { icon: Image, color: 'text-blue-400' },
+  'webp': { icon: Image, color: 'text-blue-400' },
+  'ico': { icon: Image, color: 'text-blue-400' },
+  'tif': { icon: Image, color: 'text-blue-400' },
+  'tiff': { icon: Image, color: 'text-blue-400' },
+  
+  // Videos
+  'mp4': { icon: FileVideo, color: 'text-purple-400' },
+  'avi': { icon: FileVideo, color: 'text-purple-400' },
+  'mov': { icon: FileVideo, color: 'text-purple-400' },
+  'wmv': { icon: FileVideo, color: 'text-purple-400' },
+  'flv': { icon: FileVideo, color: 'text-purple-400' },
+  'mkv': { icon: FileVideo, color: 'text-purple-400' },
+  'webm': { icon: FileVideo, color: 'text-purple-400' },
+  
+  // Audio
+  'mp3': { icon: FileAudio, color: 'text-green-400' },
+  'wav': { icon: FileAudio, color: 'text-green-400' },
+  'flac': { icon: FileAudio, color: 'text-green-400' },
+  'aac': { icon: FileAudio, color: 'text-green-400' },
+  'ogg': { icon: FileAudio, color: 'text-green-400' },
+  'wma': { icon: FileAudio, color: 'text-green-400' },
+  
+  // Archives
+  'zip': { icon: FileArchive, color: 'text-yellow-400' },
+  'rar': { icon: FileArchive, color: 'text-yellow-400' },
+  '7z': { icon: FileArchive, color: 'text-yellow-400' },
+  'tar': { icon: FileArchive, color: 'text-yellow-400' },
+  'gz': { icon: FileArchive, color: 'text-yellow-400' },
+  'bz2': { icon: FileArchive, color: 'text-yellow-400' },
+  'xz': { icon: FileArchive, color: 'text-yellow-400' },
+  
+  // Code
+  'js': { icon: FileCode, color: 'text-yellow-300' },
+  'jsx': { icon: FileCode, color: 'text-yellow-300' },
+  'ts': { icon: FileCode, color: 'text-blue-300' },
+  'tsx': { icon: FileCode, color: 'text-blue-300' },
+  'py': { icon: FileCode, color: 'text-blue-300' },
+  'java': { icon: FileCode, color: 'text-orange-400' },
+  'cpp': { icon: FileCode, color: 'text-blue-400' },
+  'c': { icon: FileCode, color: 'text-blue-400' },
+  'cs': { icon: FileCode, color: 'text-purple-400' },
+  'php': { icon: FileCode, color: 'text-indigo-400' },
+  'rb': { icon: FileCode, color: 'text-red-400' },
+  'go': { icon: FileCode, color: 'text-cyan-400' },
+  'rs': { icon: FileCode, color: 'text-orange-400' },
+  'swift': { icon: FileCode, color: 'text-orange-400' },
+  'kt': { icon: FileCode, color: 'text-purple-400' },
+  'scala': { icon: FileCode, color: 'text-red-400' },
+  'sh': { icon: FileCode, color: 'text-green-400' },
+  'bash': { icon: FileCode, color: 'text-green-400' },
+  'ps1': { icon: FileCode, color: 'text-blue-400' },
+  'bat': { icon: FileCode, color: 'text-gray-400' },
+  'cmd': { icon: FileCode, color: 'text-gray-400' },
+  
+  // Data formats
+  'json': { icon: FileJson, color: 'text-green-400' },
+  'xml': { icon: FileCode, color: 'text-orange-400' },
+  'yaml': { icon: FileCode, color: 'text-purple-400' },
+  'yml': { icon: FileCode, color: 'text-purple-400' },
+  'toml': { icon: FileCode, color: 'text-yellow-400' },
+  'ini': { icon: FileCode, color: 'text-gray-400' },
+  'cfg': { icon: Settings, color: 'text-gray-400' },
+  'conf': { icon: Settings, color: 'text-gray-400' },
+  'config': { icon: Settings, color: 'text-gray-400' },
+  
+  // Documents
+  'pdf': { icon: FileText, color: 'text-red-400' },
+  'doc': { icon: FileText, color: 'text-blue-400' },
+  'docx': { icon: FileText, color: 'text-blue-400' },
+  'xls': { icon: FileSpreadsheet, color: 'text-green-400' },
+  'xlsx': { icon: FileSpreadsheet, color: 'text-green-400' },
+  'ppt': { icon: FileText, color: 'text-orange-400' },
+  'pptx': { icon: FileText, color: 'text-orange-400' },
+  'txt': { icon: FileText, color: 'text-gray-400' },
+  'rtf': { icon: FileText, color: 'text-gray-400' },
+  'md': { icon: FileText, color: 'text-gray-300' },
+  'markdown': { icon: FileText, color: 'text-gray-300' },
+  
+  // Database
+  'db': { icon: Database, color: 'text-blue-400' },
+  'sqlite': { icon: Database, color: 'text-blue-400' },
+  'sql': { icon: Database, color: 'text-blue-400' },
+  'mdb': { icon: Database, color: 'text-blue-400' },
+  'accdb': { icon: Database, color: 'text-blue-400' },
+  
+  // 3D/Point Cloud
+  'las': { icon: Package, color: 'text-cyan-400' },
+  'laz': { icon: Package, color: 'text-cyan-400' },
+  'ply': { icon: Package, color: 'text-cyan-400' },
+  'obj': { icon: Package, color: 'text-cyan-400' },
+  'fbx': { icon: Package, color: 'text-cyan-400' },
+  'dae': { icon: Package, color: 'text-cyan-400' },
+  '3ds': { icon: Package, color: 'text-cyan-400' },
+  'blend': { icon: Package, color: 'text-cyan-400' },
+  
+  // Web
+  'html': { icon: Globe, color: 'text-orange-400' },
+  'htm': { icon: Globe, color: 'text-orange-400' },
+  'css': { icon: FileCode, color: 'text-blue-400' },
+  'scss': { icon: FileCode, color: 'text-pink-400' },
+  'sass': { icon: FileCode, color: 'text-pink-400' },
+  'less': { icon: FileCode, color: 'text-blue-400' },
+  
+  // Project files
+  'rotg': { icon: FileCheck, color: 'text-primary' },
+};
+
+// Get file icon based on extension
+const getFileIcon = (fileName: string): { icon: React.ComponentType<any>; color: string } => {
+  const extension = fileName.split('.').pop()?.toLowerCase() || '';
+  return fileTypeIcons[extension] || { icon: File, color: 'text-muted-foreground' };
+};
+
 function FolderStructure({ rootPath: initialPath }: FolderStructureProps) {
   const [fileTree, setFileTree] = useState<FileSystemItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentPath, setCurrentPath] = useState<string>(initialPath || '');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ path: string; name: string } | null>(null);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const currentPath = useSelector((state: RootState) => state.projectReducer.project?.project.path || '');
+  const projectFolderPath = useSelector((state: RootState) => state.projectReducer.projectFolderPath);
+  const projectName = useSelector((state: RootState) => state.projectReducer.project?.project.name || 'Untitled Project');
 
   useEffect(() => {
     if (currentPath) {
@@ -187,11 +332,12 @@ function FolderStructure({ rootPath: initialPath }: FolderStructureProps) {
               </ContextMenu>
             );
           } else {
+            const { icon: FileIcon, color } = getFileIcon(item.name);
             return (
               <ContextMenu key={item.path}>
                 <ContextMenuTrigger asChild>
                   <div className="flex items-center gap-2 py-1 px-2 hover:bg-accent rounded-sm text-xs cursor-pointer">
-                    <File className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    <FileIcon className={`h-3 w-3 ${color} flex-shrink-0`} />
                     <span className="truncate">{item.name}</span>
                   </div>
                 </ContextMenuTrigger>
@@ -220,44 +366,14 @@ function FolderStructure({ rootPath: initialPath }: FolderStructureProps) {
     );
   };
 
-  const handlePathChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCurrentPath(e.target.value);
-  };
-
   const handleLoadPath = () => {
     if (currentPath.trim()) {
       loadDirectory(currentPath.trim());
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleLoadPath();
-    }
-  };
-
   return (
     <div className="w-full h-full flex flex-col overflow-hidden">
-      <div className="p-2 border-b border-border flex items-center gap-2">
-        <FolderOpen className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-        <Input
-          type="text"
-          placeholder="Enter folder path..."
-          value={currentPath}
-          onChange={handlePathChange}
-          onKeyPress={handleKeyPress}
-          className="flex-1 text-xs h-7"
-        />
-        <Button
-          onClick={handleLoadPath}
-          size="sm"
-          variant="default"
-          className="h-7 px-3 text-xs"
-          disabled={loading || !currentPath.trim()}
-        >
-          Load
-        </Button>
-      </div>
       <div className="flex-1 overflow-auto p-2">
         {loading ? (
           <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
@@ -271,19 +387,20 @@ function FolderStructure({ rootPath: initialPath }: FolderStructureProps) {
           <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
             Enter a folder path to view its structure
           </div>
-        ) : fileTree.length > 0 ? (
-          <>
-            <div className="mb-2 pb-2 border-b border-border">
-              <div className="text-xs font-semibold text-muted-foreground truncate">
-                {currentPath}
-              </div>
-            </div>
-            {renderFileTree(fileTree)}
-          </>
         ) : (
-          <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
-            No files found
-          </div>
+          <>
+            
+            {fileTree.length > 0 && (
+              <>
+                <div className="mb-2 pb-2 border-b border-border">
+                  <div className="text-xs font-semibold text-muted-foreground truncate">
+                    {currentPath}
+                  </div>
+                </div>
+                {renderFileTree(fileTree)}
+              </>
+            )}
+          </>
         )}
       </div>
 

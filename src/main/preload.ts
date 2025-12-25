@@ -43,5 +43,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openInExplorer: (filePath: string) => {
     return ipcRenderer.invoke('open-in-explorer', filePath);
   },
+  // Project XML operations
+  readProjectXML: (filePath: string) => {
+    return ipcRenderer.invoke('read-project-xml', filePath);
+  },
+  writeProjectXML: (filePath: string, content: string) => {
+    return ipcRenderer.invoke('write-project-xml', filePath, content);
+  },
+  createProjectDirectory: (dirPath: string) => {
+    return ipcRenderer.invoke('create-project-directory', dirPath);
+  },
+  showFolderPicker: (options?: { defaultPath?: string }) => {
+    return ipcRenderer.invoke('show-folder-picker', options);
+  },
+  showProjectFilePicker: (options?: { defaultPath?: string }) => {
+    return ipcRenderer.invoke('show-project-file-picker', options);
+  },
+  directoryExists: (dirPath: string) => {
+    return ipcRenderer.invoke('directory-exists', dirPath);
+  },
 });
 

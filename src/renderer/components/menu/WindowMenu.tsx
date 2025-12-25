@@ -13,17 +13,45 @@ import {
   MenubarSubTrigger,
   MenubarTrigger,
 } from "../ui/menubar";
+import { useState } from "react";
+import { openProject } from "../../services/ProjectLoadService";
+import { ErrorDialog } from "../dialogs/ErrorDialog";
 
 const WindowMenu = () => {
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [errorTitle, setErrorTitle] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleOpenProject = async () => {
+    try {
+      await openProject();
+    } catch (error) {
+      setErrorTitle("Error Opening Project");
+      setErrorMessage(
+        error instanceof Error ? error.message : "An unknown error occurred while opening the project."
+      );
+      setErrorDialogOpen(true);
+    }
+  };
   return (
-    <Menubar className="h-6 text-xs" style={{ border: "none", zIndex: 10002, position: "relative" }}>
-      <MenubarMenu>
-        <MenubarTrigger className="h-6 px-2 text-xs">File</MenubarTrigger>
-        <MenubarContent className="text-xs" style={{ zIndex: 10002 }}>
-          <MenubarItem className="text-xs py-1">
-            New Project <MenubarShortcut className="text-[10px]">Ctrl + N</MenubarShortcut>
-          </MenubarItem>
-          <MenubarSeparator />
+    <>
+      <ErrorDialog
+        open={errorDialogOpen}
+        onOpenChange={setErrorDialogOpen}
+        title={errorTitle}
+        message={errorMessage}
+      />
+      <Menubar className="h-6 text-xs" style={{ border: "none", zIndex: 10002, position: "relative" }}>
+        <MenubarMenu>
+          <MenubarTrigger className="h-6 px-2 text-xs">File</MenubarTrigger>
+          <MenubarContent className="text-xs" style={{ zIndex: 10002 }}>
+            <MenubarItem className="text-xs py-1">
+              New Project <MenubarShortcut className="text-[10px]">Ctrl + N</MenubarShortcut>
+            </MenubarItem>
+            <MenubarItem className="text-xs py-1" onClick={handleOpenProject}>
+              Open Project... <MenubarShortcut className="text-[10px]">Ctrl + O</MenubarShortcut>
+            </MenubarItem>
+            <MenubarSeparator />
           <MenubarItem className="text-xs py-1">
             New Window <MenubarShortcut className="text-[10px]">⌘N</MenubarShortcut>
           </MenubarItem>
@@ -105,7 +133,8 @@ const WindowMenu = () => {
           <MenubarItem className="text-xs py-1" inset>Add Profile...</MenubarItem>
         </MenubarContent>
       </MenubarMenu>
-    </Menubar>
+      </Menubar>
+    </>
   )
 }
 

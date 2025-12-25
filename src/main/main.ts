@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
@@ -249,11 +249,51 @@ function createWindow(): void {
       mainWindow?.webContents.executeJavaScript(`
         (function() {
           if (window.electronAPI) {
-            // Zaten varsa readDirectory'yi kontrol et ve ekle
+            // Zaten varsa eksik fonksiyonları kontrol et ve ekle
+            const { ipcRenderer } = require('electron');
             if (!window.electronAPI.readDirectory) {
-              const { ipcRenderer } = require('electron');
               window.electronAPI.readDirectory = (dirPath) => {
                 return ipcRenderer.invoke('read-directory', dirPath);
+              };
+            }
+            if (!window.electronAPI.deleteFile) {
+              window.electronAPI.deleteFile = (filePath) => {
+                return ipcRenderer.invoke('delete-file', filePath);
+              };
+            }
+            if (!window.electronAPI.openInExplorer) {
+              window.electronAPI.openInExplorer = (filePath) => {
+                return ipcRenderer.invoke('open-in-explorer', filePath);
+              };
+            }
+            if (!window.electronAPI.readProjectXML) {
+              window.electronAPI.readProjectXML = (filePath) => {
+                return ipcRenderer.invoke('read-project-xml', filePath);
+              };
+            }
+            if (!window.electronAPI.writeProjectXML) {
+              window.electronAPI.writeProjectXML = (filePath, content) => {
+                return ipcRenderer.invoke('write-project-xml', filePath, content);
+              };
+            }
+            if (!window.electronAPI.createProjectDirectory) {
+              window.electronAPI.createProjectDirectory = (dirPath) => {
+                return ipcRenderer.invoke('create-project-directory', dirPath);
+              };
+            }
+            if (!window.electronAPI.showFolderPicker) {
+              window.electronAPI.showFolderPicker = (options) => {
+                return ipcRenderer.invoke('show-folder-picker', options);
+              };
+            }
+            if (!window.electronAPI.showProjectFilePicker) {
+              window.electronAPI.showProjectFilePicker = (options) => {
+                return ipcRenderer.invoke('show-project-file-picker', options);
+              };
+            }
+            if (!window.electronAPI.directoryExists) {
+              window.electronAPI.directoryExists = (dirPath) => {
+                return ipcRenderer.invoke('directory-exists', dirPath);
               };
             }
             return;
@@ -286,9 +326,27 @@ function createWindow(): void {
             },
             openInExplorer: (filePath) => {
               return ipcRenderer.invoke('open-in-explorer', filePath);
+            },
+            readProjectXML: (filePath) => {
+              return ipcRenderer.invoke('read-project-xml', filePath);
+            },
+            writeProjectXML: (filePath, content) => {
+              return ipcRenderer.invoke('write-project-xml', filePath, content);
+            },
+            createProjectDirectory: (dirPath) => {
+              return ipcRenderer.invoke('create-project-directory', dirPath);
+            },
+            showFolderPicker: (options) => {
+              return ipcRenderer.invoke('show-folder-picker', options);
+            },
+            showProjectFilePicker: (options) => {
+              return ipcRenderer.invoke('show-project-file-picker', options);
+            },
+            directoryExists: (dirPath) => {
+              return ipcRenderer.invoke('directory-exists', dirPath);
             }
           };
-          console.log('ElectronAPI injected with readDirectory:', typeof window.electronAPI.readDirectory);
+          console.log('ElectronAPI injected with all functions');
         })();
       `).catch(console.error);
     };
@@ -419,14 +477,119 @@ ipcMain.handle('open-in-explorer', async (_event, filePath: string): Promise<voi
       // macOS: Reveal in Finder
       shell.showItemInFolder(normalizedPath);
     } else {
-      // Linux: Open containing folder
-      const { exec } = require('child_process');
-      const dirPath = path.dirname(normalizedPath);
-      exec(`xdg-open "${dirPath}"`);
+      // Linux: Open in file manager
+      shell.showItemInFolder(normalizedPath);
     }
   } catch (error) {
     console.error('Error in open-in-explorer handler:', error);
     throw error;
+  }
+});
+
+// Read XML project file
+ipcMain.handle('read-project-xml', async (_event, filePath: string): Promise<string> => {
+  try {
+    const normalizedPath = path.normalize(filePath);
+    const content = await fsPromises.readFile(normalizedPath, 'utf-8');
+    return content;
+  } catch (error) {
+    console.error('Error in read-project-xml handler:', error);
+    throw error;
+  }
+});
+
+// Write XML project file
+ipcMain.handle('write-project-xml', async (_event, filePath: string, content: string): Promise<void> => {
+  try {
+    const normalizedPath = path.normalize(filePath);
+    const dir = path.dirname(normalizedPath);
+    
+    // Only create directory if it's not a root directory (e.g., "C:\", "D:\")
+    // Root directories cannot be created and don't need to be created
+    const isRootDir = /^[A-Za-z]:[\\/]?$/.test(dir);
+    if (!isRootDir) {
+      // Create directory if it doesn't exist
+      await fsPromises.mkdir(dir, { recursive: true });
+    }
+    
+    await fsPromises.writeFile(normalizedPath, content, 'utf-8');
+  } catch (error) {
+    console.error('Error in write-project-xml handler:', error);
+    throw error;
+  }
+});
+
+// Create project directory
+ipcMain.handle('create-project-directory', async (_event, dirPath: string): Promise<void> => {
+  try {
+    const normalizedPath = path.normalize(dirPath);
+    await fsPromises.mkdir(normalizedPath, { recursive: true });
+  } catch (error) {
+    console.error('Error in create-project-directory handler:', error);
+    throw error;
+  }
+});
+
+// Show folder picker dialog
+ipcMain.handle('show-folder-picker', async (_event, options?: { defaultPath?: string }): Promise<string | null> => {
+  try {
+    if (!mainWindow) {
+      throw new Error('Main window not available');
+    }
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory'],
+      defaultPath: options?.defaultPath,
+      title: 'Select Project Save Location',
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    return result.filePaths[0];
+  } catch (error) {
+    console.error('Error in show-folder-picker handler:', error);
+    throw error;
+  }
+});
+
+// Show file picker dialog for .rotg files
+ipcMain.handle('show-project-file-picker', async (_event, options?: { defaultPath?: string }): Promise<string | null> => {
+  try {
+    if (!mainWindow) {
+      throw new Error('Main window not available');
+    }
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'RotGIS Project Files', extensions: ['rotg'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      defaultPath: options?.defaultPath,
+      title: 'Open Project',
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    return result.filePaths[0];
+  } catch (error) {
+    console.error('Error in show-project-file-picker handler:', error);
+    throw error;
+  }
+});
+
+// Check if directory exists
+ipcMain.handle('directory-exists', async (_event, dirPath: string): Promise<boolean> => {
+  try {
+    const normalizedPath = path.normalize(dirPath);
+    const stats = await fsPromises.stat(normalizedPath);
+    return stats.isDirectory();
+  } catch (error) {
+    return false;
   }
 });
 

@@ -7,13 +7,18 @@ import React from 'react';
 import HeightProfileViewer from './components/viewer/HeightProfileViewer';
 import StatusBar from './components/StatusBar';
 import Main from './components/pages/Main';
+import { setupProjectAutoSave } from './services/ProjectAutoSave';
+import ProjectActions from './store/actions/ProjectActions';
+import ProjectService from './services/ProjectService';
+import store, { RootState } from './store/store';
+import { useSelector } from 'react-redux';
 
 // Potree için performans optimizasyonları
 const App = memo(function App() {
   // Performance monitoring için ref
   const renderCount = useRef(0);
   renderCount.current += 1;
-
+  const project = useSelector((state: RootState) => state.projectReducer.project);
   // Potree için memory ve performance optimizasyonları
   useEffect(() => {
     // RequestAnimationFrame throttling optimizasyonu
@@ -42,6 +47,23 @@ const App = memo(function App() {
     };
 
     return cleanup;
+  }, []);
+
+  useEffect(() => {
+    console.log("Current project changed:", project);
+  }, [project]);
+
+  // Initialize project and auto-save
+  useEffect(() => {
+    // Create default project if none exists
+    const projectState = store.getState().projectReducer;
+    if (!projectState.project) {
+      const defaultProject = ProjectService.createNewProject("Untitled Project", "");
+      ProjectActions.setProject(defaultProject);
+    }
+
+    // Setup auto-save
+    setupProjectAutoSave();
   }, []);
 
   return (
