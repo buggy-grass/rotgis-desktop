@@ -38,6 +38,7 @@ import {
 } from "../ui/menubar";
 import FolderStructure from "./FolderStructure";
 import LayerBox, { LayersRef } from "./LayerBox";
+import AddLayerDialog from "../dialogs/AddLayerDialog";
 
 const useStyles = makeUseStyles({
   container: {
@@ -88,6 +89,7 @@ function Toolbox() {
   const tabRefs = React.useRef<{ [key: string]: HTMLDivElement | null }>({});
   const indicatorRef = React.useRef<HTMLDivElement>(null);
   const layersRef = React.useRef<LayersRef>(null);
+  const [addLayerDialogOpen, setAddLayerDialogOpen] = React.useState(false);
 
   const tablist = [
     { value: "layers", label: "Layers", icon: Layers },
@@ -110,8 +112,19 @@ function Toolbox() {
     }
   }, [activeTab]);
 
+  const handleImportLayer = (layerType: "point-cloud" | "mesh" | "vector", filePath: string) => {
+    console.log("Importing layer:", layerType, filePath);
+    // TODO: Implement layer import logic
+  };
+
   return (
-    <div style={styles.container} className="border-r border-border">
+    <>
+      <AddLayerDialog
+        open={addLayerDialogOpen}
+        onOpenChange={setAddLayerDialogOpen}
+        onImport={handleImportLayer}
+      />
+      <div style={styles.container} className="border-r border-border">
       <div style={styles.header}>
         <Label icon={Boxes} iconClassName="h-3 w-3">
           {"Toolbox/" +
@@ -209,6 +222,7 @@ function Toolbox() {
                           cursor: "pointer",
                           position: "relative",
                         }}
+                        onClick={() => setAddLayerDialogOpen(true)}
                       >
                         <Button
                           className="flex items-center"
@@ -338,6 +352,7 @@ function Toolbox() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

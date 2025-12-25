@@ -115,8 +115,7 @@ export function SaveProjectDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title="Save Project" showCloseButton>
         <DialogHeader>
-          <DialogTitle>Save Project</DialogTitle>
-          <DialogDescription>
+          <DialogDescription style={{ color: "#a3a3a3" }}>
             Enter project name, choose where to save, and select the EPSG coordinate system.
           </DialogDescription>
         </DialogHeader>

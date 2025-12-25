@@ -27,11 +27,7 @@ export function ErrorDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title={title} showCloseButton>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-            {title}
-          </DialogTitle>
-          <DialogDescription className="pt-2">
+          <DialogDescription style={{ color: "#a3a3a3" }}>
             {message}
           </DialogDescription>
         </DialogHeader>

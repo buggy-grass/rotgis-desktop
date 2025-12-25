@@ -296,6 +296,11 @@ function createWindow(): void {
                 return ipcRenderer.invoke('directory-exists', dirPath);
               };
             }
+            if (!window.electronAPI.showFilePicker) {
+              window.electronAPI.showFilePicker = (options) => {
+                return ipcRenderer.invoke('show-file-picker', options);
+              };
+            }
             return;
           }
           const { ipcRenderer } = require('electron');
@@ -344,6 +349,9 @@ function createWindow(): void {
             },
             directoryExists: (dirPath) => {
               return ipcRenderer.invoke('directory-exists', dirPath);
+            },
+            showFilePicker: (options) => {
+              return ipcRenderer.invoke('show-file-picker', options);
             }
           };
           console.log('ElectronAPI injected with all functions');
@@ -578,6 +586,34 @@ ipcMain.handle('show-project-file-picker', async (_event, options?: { defaultPat
     return result.filePaths[0];
   } catch (error) {
     console.error('Error in show-project-file-picker handler:', error);
+    throw error;
+  }
+});
+
+// Show file picker dialog with custom filters
+ipcMain.handle('show-file-picker', async (_event, options: { 
+  filters: Array<{ name: string; extensions: string[] }>;
+  title?: string;
+  defaultPath?: string;
+}): Promise<{ canceled: boolean; filePaths: string[] }> => {
+  try {
+    if (!mainWindow) {
+      throw new Error('Main window not available');
+    }
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      filters: options.filters,
+      defaultPath: options.defaultPath,
+      title: options.title || 'Select File',
+    });
+
+    return {
+      canceled: result.canceled,
+      filePaths: result.filePaths,
+    };
+  } catch (error) {
+    console.error('Error in show-file-picker handler:', error);
     throw error;
   }
 });

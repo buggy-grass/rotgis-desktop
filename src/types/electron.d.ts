@@ -22,6 +22,11 @@ export interface ElectronAPI {
   createProjectDirectory: (dirPath: string) => Promise<void>;
   showFolderPicker: (options?: { defaultPath?: string }) => Promise<string | null>;
   showProjectFilePicker: (options?: { defaultPath?: string }) => Promise<string | null>;
+  showFilePicker: (options: { 
+    filters: Array<{ name: string; extensions: string[] }>;
+    title?: string;
+    defaultPath?: string;
+  }) => Promise<{ canceled: boolean; filePaths: string[] }>;
   directoryExists: (dirPath: string) => Promise<boolean>;
 }
 

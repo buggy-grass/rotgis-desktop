@@ -59,6 +59,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showProjectFilePicker: (options?: { defaultPath?: string }) => {
     return ipcRenderer.invoke('show-project-file-picker', options);
   },
+  showFilePicker: (options: { 
+    filters: Array<{ name: string; extensions: string[] }>;
+    title?: string;
+    defaultPath?: string;
+  }) => {
+    return ipcRenderer.invoke('show-file-picker', options);
+  },
   directoryExists: (dirPath: string) => {
     return ipcRenderer.invoke('directory-exists', dirPath);
   },
