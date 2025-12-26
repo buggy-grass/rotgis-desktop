@@ -9,6 +9,7 @@ import {
 import { Layers as LayersIcon, Eye, EyeOff, Settings, Trash2 } from 'lucide-react';
 import { RootState } from '../../store/store';
 import { PointCloud, Mesh, Orthophoto } from '../../types/ProjectTypes';
+import PotreeService from '../../services/PotreeService';
 
 interface Layer {
   id: string;
@@ -226,14 +227,22 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         </Accordion>
       );
     } else {
+      const handleLayerClick = () => {
+        // If it's a point cloud, focus to it
+        if (layer.type === 'point-cloud' && layer.data) {
+          PotreeService.focusToPointCloud(layer.id);
+        }
+      };
+
       return (
         <div
           key={layer.id}
-          className="flex items-center gap-2 py-1 px-2 hover:bg-accent rounded-sm text-xs"
+          className="flex items-center gap-2 py-1 px-2 hover:bg-accent rounded-sm text-xs cursor-pointer"
+          onClick={handleLayerClick}
         >
           <LayersIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           <span className="truncate flex-1">{layer.name}</span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <div
               className="h-5 w-5 p-0 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer"
               onClick={() => toggleVisibility(layer.id)}

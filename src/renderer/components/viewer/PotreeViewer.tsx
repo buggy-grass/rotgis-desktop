@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback } from "react";
+import { useSelector } from "react-redux";
 import PointCloudService from "../../services/PointCloudService";
 import StatusBarActions from "../../store/actions/StatusBarActions";
 import PotreeService from "../../services/PotreeService";
@@ -6,7 +7,9 @@ import PotreeBackgroundService from "../../services/PotreeBackgroundService";
 import FPSMeter from "../FPSMeter";
 import Compass from "../Compass";
 import OrbitController from "../OrbitController";
+import { RootState } from "../../store/store";
 import "../../services/EventEmitter";
+import ProjectActions from "../../store/actions/ProjectActions";
 
 const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const potreeRenderAreaRef = React.useRef<HTMLDivElement>(null);
@@ -168,10 +171,6 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         // Gradient-grid background modunu ekle
         PotreeBackgroundService.setupGradientGridBackground(window.viewer);
 
-        loadPointCloud(
-          "C:\\Users\\bugra.cimen\\Desktop\\bugra\\rotgis-desktop\\test_data\\metadata.json",
-          "pc"
-        );
         window.viewer.renderer.setClearColor(0x1f1f1f, 1);
         // Gradient-grid background'u aktif et
         window.viewer.setBackground("gradient-grid");
@@ -396,6 +395,46 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     // Potree'nin update event'ini dinle
     viewer.addEventListener("update", checkRotationChange);
   };
+
+  // Get project metadata from Redux store
+  const project = useSelector((state: RootState) => state.projectReducer.project);
+
+  // Load point clouds from project metadata when store updates
+  useEffect(() => {
+    if (!window.viewer || !isPotreeReady || !project?.metadata?.pointCloud) {
+      return;
+    }
+
+    const pointClouds = project.metadata.pointCloud;
+    const loadedPointCloudIds = new Set(
+      window.viewer.scene.pointclouds.map((pc: any) => pc.name)
+    );
+
+    // Check each point cloud in metadata
+    pointClouds.forEach((pc) => {
+      // Skip if already loaded
+      if (loadedPointCloudIds.has(pc.id)) {
+        return;
+      }
+
+      // Skip if path or asset is empty
+      if (!pc.path || !pc.asset) {
+        console.warn(`Point cloud ${pc.id} has no path or asset, skipping load`);
+        return;
+      }
+
+      const project = ProjectActions.getProjectState();
+      
+      if(!project.project?.project.path){
+        return;
+      }
+
+      const pointCloudPath = window.electronAPI.pathJoin(project.project?.project.path,pc.asset);
+      console.log(`Loading point cloud from ${pointCloudPath}`);
+      // Load point cloud using asset path
+      loadPointCloud(pointCloudPath, pc.id);
+    });
+  }, [project?.metadata?.pointCloud, isPotreeReady]);
 
   const potreeOnMouseMove = async (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isMouseWheelHeld && !isObjectMoving) {

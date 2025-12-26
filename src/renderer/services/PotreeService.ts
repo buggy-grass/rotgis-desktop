@@ -571,5 +571,55 @@ class PotreeService {
       return 1;
     }
   }
+
+  /**
+   * Focus to a specific point cloud by its ID using bbox
+   * @param pointCloudId The ID of the point cloud to focus on
+   */
+  static focusToPointCloud(pointCloudId: string) {
+    if (!window.viewer) {
+      console.warn("Viewer is not initialized");
+      return;
+    }
+
+    const pointClouds = window.viewer.scene.pointclouds;
+    const pointCloud = pointClouds.find((pc: any) => pc.name === pointCloudId);
+
+    if (!pointCloud) {
+      console.warn(`Point cloud with ID ${pointCloudId} not found in viewer`);
+      return;
+    }
+
+    // Get bounding box from point cloud
+    // Potree point clouds have a boundingBox property or we can use getBoundingBox method
+    let bbox;
+    if (pointCloud.getBoundingBox) {
+      bbox = pointCloud.getBoundingBox();
+    } else if (pointCloud.boundingBox) {
+      bbox = pointCloud.boundingBox;
+    } else if (pointCloud.root && pointCloud.root.boundingBox) {
+      bbox = pointCloud.root.boundingBox;
+    }
+    
+    if (!bbox) {
+      // Fallback: try to get bounding box from viewer
+      const allBbox = window.viewer.getBoundingBox([pointCloud]);
+      if (allBbox) {
+        bbox = allBbox;
+      } else {
+        console.warn(`Bounding box not available for point cloud ${pointCloudId}`);
+        // Still try to zoom to the point cloud directly
+        window.viewer.zoomTo(pointCloud, 1.2, 500);
+        return;
+      }
+    }
+
+    // Create a temporary object with bounding box for zoom
+    const node = new window.THREE.Object3D();
+    node.boundingBox = bbox;
+    
+    // Zoom to the point cloud with animation
+    window.viewer.zoomTo(node, 1.2, 500);
+  }
 }
 export default PotreeService;
