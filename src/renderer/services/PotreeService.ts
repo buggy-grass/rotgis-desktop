@@ -573,7 +573,7 @@ class PotreeService {
   }
 
   /**
-   * Focus to a specific point cloud by its ID using bbox
+   * Focus to a specific point cloud by its ID
    * @param pointCloudId The ID of the point cloud to focus on
    */
   static focusToPointCloud(pointCloudId: string) {
@@ -590,36 +590,25 @@ class PotreeService {
       return;
     }
 
-    // Get bounding box from point cloud
-    // Potree point clouds have a boundingBox property or we can use getBoundingBox method
-    let bbox;
-    if (pointCloud.getBoundingBox) {
-      bbox = pointCloud.getBoundingBox();
-    } else if (pointCloud.boundingBox) {
-      bbox = pointCloud.boundingBox;
-    } else if (pointCloud.root && pointCloud.root.boundingBox) {
-      bbox = pointCloud.root.boundingBox;
-    }
-    
-    if (!bbox) {
-      // Fallback: try to get bounding box from viewer
-      const allBbox = window.viewer.getBoundingBox([pointCloud]);
-      if (allBbox) {
-        bbox = allBbox;
-      } else {
-        console.warn(`Bounding box not available for point cloud ${pointCloudId}`);
-        // Still try to zoom to the point cloud directly
-        window.viewer.zoomTo(pointCloud, 1.2, 500);
-        return;
+    // Use Potree's built-in zoomTo method directly on the point cloud
+    // This is the most reliable way to focus on a point cloud
+    try {
+      window.viewer.zoomTo(pointCloud, 1.2, 500);
+    } catch (error) {
+      console.error(`Error zooming to point cloud ${pointCloudId}:`, error);
+      
+      // Fallback: try using bounding box
+      try {
+        const bbox = window.viewer.getBoundingBox([pointCloud]);
+        if (bbox) {
+          const node = new window.THREE.Object3D();
+          node.boundingBox = bbox;
+          window.viewer.zoomTo(node, 1.2, 500);
+        }
+      } catch (fallbackError) {
+        console.error(`Fallback zoom also failed for point cloud ${pointCloudId}:`, fallbackError);
       }
     }
-
-    // Create a temporary object with bounding box for zoom
-    const node = new window.THREE.Object3D();
-    node.boundingBox = bbox;
-    
-    // Zoom to the point cloud with animation
-    window.viewer.zoomTo(node, 1.2, 500);
   }
 }
 export default PotreeService;
