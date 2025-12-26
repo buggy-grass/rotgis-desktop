@@ -1,8 +1,11 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
-import { spawn } from 'child_process';
+import { spawn, exec } from 'child_process';
+import { promisify } from 'util';
 import * as fs from 'fs';
 import * as fsPromises from 'fs/promises';
+
+const execAsync = promisify(exec);
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -57,6 +60,10 @@ if (process.platform === 'win32') {
   // Not: use-angle sadece bir kez kullanılabilir, son eklenen geçerli olur
   // OpenGL desktop adapter index ile çakışıyor, bu yüzden DirectX 11 kullanıyoruz
   app.commandLine.appendSwitch('use-angle', 'd3d11');
+  app.commandLine.appendSwitch("force_high_performance_gpu");
+  app.commandLine.appendSwitch("disable-frame-rate-limit");
+  app.commandLine.appendSwitch("disable-gpu-vsync");
+  app.commandLine.appendSwitch("disable-features", "VsyncProvider");
   
   // Desktop OpenGL - adapter index ile çakışıyor, kullanmıyoruz
   // app.commandLine.appendSwitch('use-gl', 'desktop');
@@ -65,7 +72,7 @@ if (process.platform === 'win32') {
   app.commandLine.appendSwitch('disable-gpu-sandbox');
   
   // Chrome OS video decoder'ı kapat (Windows'ta gerekli değil)
-  app.commandLine.appendSwitch('disable-features', 'UseChromeOSDirectVideoDecoder');
+  // app.commandLine.appendSwitch('disable-features', 'UseChromeOSDirectVideoDecoder');
   
   // Windows'ta DirectX 11 ve GPU seçimini optimize et
   app.commandLine.appendSwitch('enable-features', 'UseD3D11,DefaultANGLEOpenGL');
@@ -301,6 +308,32 @@ function createWindow(): void {
                 return ipcRenderer.invoke('show-file-picker', options);
               };
             }
+            if (!window.electronAPI.getShortPath) {
+              window.electronAPI.getShortPath = (filePath) => {
+                return ipcRenderer.invoke('get-short-path', filePath);
+              };
+            }
+            if (!window.electronAPI.executeCommand) {
+              window.electronAPI.executeCommand = (options) => {
+                return ipcRenderer.invoke('execute-command', options);
+              };
+            }
+            if (!window.electronAPI.onCommandStdout) {
+              window.electronAPI.onCommandStdout = (callback) => {
+                ipcRenderer.on('command-stdout', (event, line) => callback(line));
+              };
+            }
+            if (!window.electronAPI.onCommandStderr) {
+              window.electronAPI.onCommandStderr = (callback) => {
+                ipcRenderer.on('command-stderr', (event, line) => callback(line));
+              };
+            }
+            if (!window.electronAPI.removeCommandListeners) {
+              window.electronAPI.removeCommandListeners = () => {
+                ipcRenderer.removeAllListeners('command-stdout');
+                ipcRenderer.removeAllListeners('command-stderr');
+              };
+            }
             return;
           }
           const { ipcRenderer } = require('electron');
@@ -352,6 +385,29 @@ function createWindow(): void {
             },
             showFilePicker: (options) => {
               return ipcRenderer.invoke('show-file-picker', options);
+            },
+            getShortPath: (filePath) => {
+              return ipcRenderer.invoke('get-short-path', filePath);
+            },
+            getAppPath: () => {
+              return ipcRenderer.invoke('get-app-path');
+            },
+            pathJoin: (...paths) => {
+              const path = require('path');
+              return path.join(...paths);
+            },
+            executeCommand: (options) => {
+              return ipcRenderer.invoke('execute-command', options);
+            },
+            onCommandStdout: (callback) => {
+              ipcRenderer.on('command-stdout', (event, line) => callback(line));
+            },
+            onCommandStderr: (callback) => {
+              ipcRenderer.on('command-stderr', (event, line) => callback(line));
+            },
+            removeCommandListeners: () => {
+              ipcRenderer.removeAllListeners('command-stdout');
+              ipcRenderer.removeAllListeners('command-stderr');
             }
           };
           console.log('ElectronAPI injected with all functions');
@@ -616,6 +672,139 @@ ipcMain.handle('show-file-picker', async (_event, options: {
     console.error('Error in show-file-picker handler:', error);
     throw error;
   }
+});
+
+// Get Windows short path (8.3 format) for paths with special characters
+ipcMain.handle('get-short-path', async (_event, filePath: string): Promise<string> => {
+  try {
+    // Only works on Windows
+    if (process.platform !== 'win32') {
+      // On non-Windows platforms, return the original path
+      return filePath;
+    }
+
+    // Check if path exists
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`Path does not exist: ${filePath}`);
+    }
+
+    // Use Windows cmd to get short path
+    // cmd /c for %I in ("path") do @echo %~sI
+    // We need to escape the path properly for cmd
+    const escapedPath = filePath.replace(/"/g, '""'); // Escape double quotes
+    const command = `cmd /c for %I in ("${escapedPath}") do @echo %~sI`;
+    
+    const { stdout, stderr } = await execAsync(command, {
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+    });
+
+    if (stderr && stderr.trim()) {
+      console.warn('Warning from get-short-path:', stderr);
+    }
+
+    const shortPath = stdout.trim();
+    
+    // If short path is empty or same as original, return original
+    if (!shortPath || shortPath === filePath) {
+      return filePath;
+    }
+
+    return shortPath;
+  } catch (error) {
+    console.error('Error in get-short-path handler:', error);
+    // If getting short path fails, return the original path
+    return filePath;
+  }
+});
+
+// Get application path (works in both development and production)
+ipcMain.handle('get-app-path', async (): Promise<string> => {
+  try {
+    if (app.isPackaged) {
+      // Production: app.asar içinde
+      // app.getAppPath() returns path to app.asar or app directory
+      return app.getAppPath().replace(/[\\/]app\.asar$/, '');
+    } else {
+      // Development: process.cwd() returns project root
+      return process.cwd();
+    }
+  } catch (error) {
+    console.error('Error getting app path:', error);
+    // Fallback to process.cwd()
+    return process.cwd();
+  }
+});
+
+// Execute shell command and stream stdout/stderr
+ipcMain.handle('execute-command', async (_event, options: {
+  command: string;
+  args?: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+}): Promise<{ success: boolean; exitCode: number; error?: string }> => {
+  return new Promise((resolve) => {
+    try {
+      const { command, args = [], cwd, env } = options;
+      
+      const childProcess = spawn(command, args, {
+        cwd: cwd || process.cwd(),
+        env: { ...process.env, ...env },
+        shell: process.platform === 'win32', // Windows'ta shell kullan
+      });
+
+      let stdoutData = '';
+      let stderrData = '';
+
+      // stdout stream
+      childProcess.stdout?.on('data', (data: Buffer) => {
+        const text = data.toString('utf8');
+        stdoutData += text;
+        // Her satırı renderer'a gönder
+        const lines = text.split('\n').filter(line => line.trim());
+        lines.forEach(line => {
+          if (mainWindow) {
+            mainWindow.webContents.send('command-stdout', line);
+          }
+        });
+      });
+
+      // stderr stream
+      childProcess.stderr?.on('data', (data: Buffer) => {
+        const text = data.toString('utf8');
+        stderrData += text;
+        // Her satırı renderer'a gönder
+        const lines = text.split('\n').filter(line => line.trim());
+        lines.forEach(line => {
+          if (mainWindow) {
+            mainWindow.webContents.send('command-stderr', line);
+          }
+        });
+      });
+
+      childProcess.on('close', (code) => {
+        resolve({
+          success: code === 0,
+          exitCode: code || 0,
+          error: stderrData || undefined,
+        });
+      });
+
+      childProcess.on('error', (error) => {
+        resolve({
+          success: false,
+          exitCode: -1,
+          error: error.message,
+        });
+      });
+    } catch (error: any) {
+      resolve({
+        success: false,
+        exitCode: -1,
+        error: error?.message || 'Unknown error',
+      });
+    }
+  });
 });
 
 // Check if directory exists

@@ -94,12 +94,14 @@ const AddLayerDialog: React.FC<AddLayerDialogProps> = ({
       onImport(selectedLayerType, filePath);
       setFilePath("");
       onOpenChange(false);
+      setSelectedLayerType("point-cloud");
     }
   };
 
   const handleClose = () => {
     setFilePath("");
     onOpenChange(false);
+    setSelectedLayerType("point-cloud");
   };
 
   return (

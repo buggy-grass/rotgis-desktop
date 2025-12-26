@@ -6,6 +6,10 @@ const initialState: IAppState = {
   appName: "RotGIS Desktop",
   projectName: "Untitled Project",
   isLoading: false,
+  loadingProgress: {
+    percentage: 0,
+    message: "",
+  },
 };
 
 const AppReducer: Reducer<IAppState, IActionsProps> = (
@@ -27,6 +31,22 @@ const AppReducer: Reducer<IAppState, IActionsProps> = (
       return {
         ...state,
         isLoading: action.payload.isLoading,
+      };
+    case "APP_REDUCER/SET_LOADING_PROGRESS":
+      return {
+        ...state,
+        loadingProgress: {
+          percentage: action.payload.percentage ?? state.loadingProgress.percentage,
+          message: action.payload.message ?? state.loadingProgress.message,
+        },
+      };
+    case "APP_REDUCER/RESET_LOADING_PROGRESS":
+      return {
+        ...state,
+        loadingProgress: {
+          percentage: 0,
+          message: "",
+        },
       };
     case "APP_REDUCER/GET_APP_STATE":
       return { ...state };

@@ -36,11 +36,11 @@ const TooltipContent = React.forwardRef<
                           "before:border-[8px] after:border-[8px]"
 
   return (
-    <TooltipPrimitive.Content
-      ref={ref}
-      sideOffset={sideOffset}
+  <TooltipPrimitive.Content
+    ref={ref}
+    sideOffset={sideOffset}
       style={arrowStyle}
-      className={cn(
+    className={cn(
         "z-[10004] overflow-visible rounded-md border bg-popover px-2 py-1 text-[12px] text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         showArrow && [
           "before:content-[''] before:absolute before:w-0 before:h-0 before:border-transparent",
@@ -56,10 +56,10 @@ const TooltipContent = React.forwardRef<
           "data-[side=right]:after:left-[calc(var(--arrow-offset-after)*-1)] data-[side=right]:after:top-1/2 data-[side=right]:after:-translate-y-1/2 data-[side=right]:after:border-r-border",
           arrowClassName
         ],
-        className
-      )}
-      {...props}
-    />
+      className
+    )}
+    {...props}
+  />
   )
 })
 TooltipContent.displayName = TooltipPrimitive.Content.displayName

@@ -12,6 +12,7 @@ import ProjectActions from './store/actions/ProjectActions';
 import ProjectService from './services/ProjectService';
 import store, { RootState } from './store/store';
 import { useSelector } from 'react-redux';
+import { LoadingDialog } from './components/dialogs/LoadingDialog';
 
 // Potree için performans optimizasyonları
 const App = memo(function App() {
@@ -69,6 +70,7 @@ const App = memo(function App() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
         <Main/>
+        <LoadingDialog />
     </div>
   );
 });

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import * as path from 'path';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -66,8 +67,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => {
     return ipcRenderer.invoke('show-file-picker', options);
   },
+  getShortPath: (filePath: string) => {
+    return ipcRenderer.invoke('get-short-path', filePath);
+  },
+  getAppPath: () => {
+    return ipcRenderer.invoke('get-app-path');
+  },
+  executeCommand: (options: {
+    command: string;
+    args?: string[];
+    cwd?: string;
+    env?: Record<string, string>;
+  }) => {
+    return ipcRenderer.invoke('execute-command', options);
+  },
+  onCommandStdout: (callback: (line: string) => void) => {
+    ipcRenderer.on('command-stdout', (_event, line: string) => callback(line));
+  },
+  onCommandStderr: (callback: (line: string) => void) => {
+    ipcRenderer.on('command-stderr', (_event, line: string) => callback(line));
+  },
+  removeCommandListeners: () => {
+    ipcRenderer.removeAllListeners('command-stdout');
+    ipcRenderer.removeAllListeners('command-stderr');
+  },
   directoryExists: (dirPath: string) => {
     return ipcRenderer.invoke('directory-exists', dirPath);
+  },
+  // Path utilities
+  pathJoin: (...paths: string[]) => {
+    return path.join(...paths);
   },
 });
 

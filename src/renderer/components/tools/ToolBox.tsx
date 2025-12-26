@@ -39,6 +39,7 @@ import {
 import FolderStructure from "./FolderStructure";
 import LayerBox, { LayersRef } from "./LayerBox";
 import AddLayerDialog from "../dialogs/AddLayerDialog";
+import PointCloudService from "../../services/PointCloudService";
 
 const useStyles = makeUseStyles({
   container: {
@@ -112,9 +113,23 @@ function Toolbox() {
     }
   }, [activeTab]);
 
-  const handleImportLayer = (layerType: "point-cloud" | "mesh" | "vector", filePath: string) => {
+  const handleImportLayer = async (layerType: "point-cloud" | "mesh" | "vector", filePath: string) => {
     console.log("Importing layer:", layerType, filePath);
-    // TODO: Implement layer import logic
+    try {
+     switch (layerType) {
+      case "point-cloud":
+        await PointCloudService.import(filePath);
+        break;
+        case "mesh":
+        
+        break;
+        case "vector":
+        
+        break;
+     } 
+    } catch (error) {
+      
+    }
   };
 
   return (

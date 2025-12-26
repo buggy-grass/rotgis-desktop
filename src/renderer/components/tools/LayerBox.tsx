@@ -1,4 +1,5 @@
-import React, { useState, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useImperativeHandle, forwardRef, useMemo } from 'react';
+import { useSelector } from 'react-redux';
 import {
   Accordion,
   AccordionContent,
@@ -6,11 +7,15 @@ import {
   AccordionTrigger,
 } from '../ui/accordion';
 import { Layers as LayersIcon, Eye, EyeOff, Settings, Trash2 } from 'lucide-react';
+import { RootState } from '../../store/store';
+import { PointCloud, Mesh, Orthophoto } from '../../types/ProjectTypes';
 
 interface Layer {
   id: string;
   name: string;
   visible: boolean;
+  type: 'point-cloud' | 'mesh' | 'orthophoto' | 'dsm' | 'dtm';
+  data?: PointCloud | Mesh | Orthophoto;
   children?: Layer[];
 }
 
@@ -22,44 +27,105 @@ export interface LayersRef {
 interface LayersProps {}
 
 const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
-  const [layers, setLayers] = useState<Layer[]>([
-    {
-      id: '1',
-      name: 'Point Cloud Layer',
-      visible: true,
-      children: [
-        {
-          id: '1-1',
-          name: 'Sub Layer 1',
-          visible: true,
-        },
-        {
-          id: '1-2',
-          name: 'Sub Layer 2',
-          visible: false,
-        },
-      ],
-    },
-    {
-      id: '2',
-      name: 'Mesh Layer',
-      visible: true,
-      children: [
-        {
-          id: '2-1',
-          name: 'Mesh Sub Layer 1',
-          visible: true,
-        },
-      ],
-    },
-    {
-      id: '3',
-      name: 'Vector Layer',
-      visible: false,
-    },
-  ]);
-
+  const project = useSelector((state: RootState) => state.projectReducer.project);
+  const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+
+  // Convert project metadata to Layer structure
+  const layers = useMemo<Layer[]>(() => {
+    if (!project?.metadata) {
+      return [];
+    }
+
+    const { pointCloud, mesh, orthophoto, dsm, dtm } = project.metadata;
+
+    const layersArray: Layer[] = [];
+
+    // Point Cloud Layer
+    if (pointCloud && pointCloud.length > 0) {
+      layersArray.push({
+        id: 'point-cloud-parent',
+        name: 'Point Cloud Layer',
+        visible: layerVisibility['point-cloud-parent'] !== false,
+        type: 'point-cloud',
+        children: pointCloud.map((pc) => ({
+          id: pc.id,
+          name: pc.name,
+          visible: layerVisibility[pc.id] !== false,
+          type: 'point-cloud',
+          data: pc,
+        })),
+      });
+    }
+
+    // Mesh Layer
+    if (mesh && mesh.length > 0) {
+      layersArray.push({
+        id: 'mesh-parent',
+        name: 'Mesh Layer',
+        visible: layerVisibility['mesh-parent'] !== false,
+        type: 'mesh',
+        children: mesh.map((m) => ({
+          id: m.id,
+          name: m.name,
+          visible: layerVisibility[m.id] !== false,
+          type: 'mesh',
+          data: m,
+        })),
+      });
+    }
+
+    // Vector Layer (Orthophoto, DSM, DTM)
+    const vectorChildren: Layer[] = [];
+    
+    if (orthophoto && orthophoto.length > 0) {
+      vectorChildren.push(
+        ...orthophoto.map((ortho) => ({
+          id: ortho.id,
+          name: ortho.name,
+          visible: layerVisibility[ortho.id] !== false,
+          type: 'orthophoto' as const,
+          data: ortho,
+        }))
+      );
+    }
+
+    if (dsm && dsm.length > 0) {
+      vectorChildren.push(
+        ...dsm.map((d) => ({
+          id: d.id,
+          name: d.name,
+          visible: layerVisibility[d.id] !== false,
+          type: 'dsm' as const,
+          data: d,
+        }))
+      );
+    }
+
+    if (dtm && dtm.length > 0) {
+      vectorChildren.push(
+        ...dtm.map((d) => ({
+          id: d.id,
+          name: d.name,
+          visible: layerVisibility[d.id] !== false,
+          type: 'dtm' as const,
+          data: d,
+        }))
+      );
+    }
+
+    if (vectorChildren.length > 0) {
+      layersArray.push({
+        id: 'vector-parent',
+        name: 'Vector Layer',
+        visible: layerVisibility['vector-parent'] !== false,
+        type: 'orthophoto',
+        children: vectorChildren,
+      });
+    }
+
+    return layersArray;
+  }, [project?.metadata, layerVisibility]);
 
   // Get all layer IDs that have children
   const getAllLayerIdsWithChildren = (items: Layer[]): string[] => {
@@ -85,18 +151,10 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
   }), [layers]);
 
   const toggleVisibility = (layerId: string) => {
-    const updateLayer = (items: Layer[]): Layer[] => {
-      return items.map((item) => {
-        if (item.id === layerId) {
-          return { ...item, visible: !item.visible };
-        }
-        if (item.children) {
-          return { ...item, children: updateLayer(item.children) };
-        }
-        return item;
-      });
-    };
-    setLayers(updateLayer(layers));
+    setLayerVisibility((prev) => ({
+      ...prev,
+      [layerId]: prev[layerId] === undefined ? false : !prev[layerId],
+    }));
   };
 
   const handleAccordionChange = (layerId: string, value: string) => {
@@ -113,6 +171,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
 
   const renderLayer = (layer: Layer, level: number = 0): React.ReactNode => {
     const hasChildren = layer.children && layer.children.length > 0;
+    const isVisible = layerVisibility[layer.id] !== false; // Default to true if not set
 
     if (hasChildren) {
       const isExpanded = expandedItems.includes(layer.id);
@@ -140,7 +199,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                       toggleVisibility(layer.id);
                     }}
                   >
-                    {layer.visible ? (
+                    {isVisible ? (
                       <Eye className="h-3 w-3" />
                     ) : (
                       <EyeOff className="h-3 w-3 text-muted-foreground" />
@@ -179,7 +238,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
               className="h-5 w-5 p-0 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer"
               onClick={() => toggleVisibility(layer.id)}
             >
-              {layer.visible ? (
+              {isVisible ? (
                 <Eye className="h-3 w-3" />
               ) : (
                 <EyeOff className="h-3 w-3 text-muted-foreground" />

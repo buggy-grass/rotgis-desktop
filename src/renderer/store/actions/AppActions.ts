@@ -26,6 +26,19 @@ class AppActions {
       payload: { isLoading },
     });
   }
+
+  static setLoadingProgress(percentage: number, message: string) {
+    store.dispatch({
+      type: "APP_REDUCER/SET_LOADING_PROGRESS",
+      payload: { percentage, message },
+    });
+  }
+
+  static resetLoadingProgress() {
+    store.dispatch({
+      type: "APP_REDUCER/RESET_LOADING_PROGRESS",
+    });
+  }
 }
 
 export default AppActions;

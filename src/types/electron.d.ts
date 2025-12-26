@@ -27,7 +27,19 @@ export interface ElectronAPI {
     title?: string;
     defaultPath?: string;
   }) => Promise<{ canceled: boolean; filePaths: string[] }>;
+  getShortPath: (filePath: string) => Promise<string>;
+  getAppPath: () => Promise<string>;
+  executeCommand: (options: {
+    command: string;
+    args?: string[];
+    cwd?: string;
+    env?: Record<string, string>;
+  }) => Promise<{ success: boolean; exitCode: number; error?: string }>;
+  onCommandStdout: (callback: (line: string) => void) => void;
+  onCommandStderr: (callback: (line: string) => void) => void;
+  removeCommandListeners: () => void;
   directoryExists: (dirPath: string) => Promise<boolean>;
+  pathJoin: (...paths: string[]) => string;
 }
 
 declare global {
