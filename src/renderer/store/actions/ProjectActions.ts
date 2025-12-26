@@ -102,10 +102,34 @@ class ProjectActions {
       return;
     }
 
-    // Check if DTM with same ID or same path already exists
+    // Skip if DTM has no ID or empty ID
+    if (!dtm.id || dtm.id.trim() === '') {
+      console.warn("Cannot add DTM: DTM has no ID or empty ID");
+      return;
+    }
+
+    // Check if DTM with same ID, path, or asset already exists
     const existingDTMs = currentState.project.metadata.dtm || [];
-    const existsById = existingDTMs.some((d) => d.id === dtm.id);
-    const existsByPath = existingDTMs.some((d) => d.path === dtm.path);
+    
+    // Normalize paths for comparison
+    const normalizePath = (path: string | undefined | null): string => {
+      if (!path) return '';
+      return path.replace(/\\/g, '/').toLowerCase().trim();
+    };
+    
+    const normalizedNewPath = normalizePath(dtm.path);
+    const normalizedNewAsset = normalizePath(dtm.asset);
+    
+    // Check for duplicates - more comprehensive check
+    const existsById = existingDTMs.some((d) => d.id && d.id.trim() !== '' && d.id === dtm.id);
+    const existsByPath = normalizedNewPath && normalizedNewPath !== '' && existingDTMs.some((d) => {
+      const normalizedExistingPath = normalizePath(d.path);
+      return normalizedExistingPath && normalizedExistingPath !== '' && normalizedExistingPath === normalizedNewPath;
+    });
+    const existsByAsset = normalizedNewAsset && normalizedNewAsset !== '' && existingDTMs.some((d) => {
+      const normalizedExistingAsset = normalizePath(d.asset);
+      return normalizedExistingAsset && normalizedExistingAsset !== '' && normalizedExistingAsset === normalizedNewAsset;
+    });
     
     if (existsById) {
       console.warn(`DTM with ID ${dtm.id} already exists, skipping add`);
@@ -114,6 +138,11 @@ class ProjectActions {
 
     if (existsByPath) {
       console.warn(`DTM with path ${dtm.path} already exists, skipping add`);
+      return;
+    }
+
+    if (existsByAsset) {
+      console.warn(`DTM with asset ${dtm.asset} already exists, skipping add`);
       return;
     }
 
@@ -145,10 +174,34 @@ class ProjectActions {
       return;
     }
 
-    // Check if DSM with same ID or same path already exists
+    // Skip if DSM has no ID or empty ID
+    if (!dsm.id || dsm.id.trim() === '') {
+      console.warn("Cannot add DSM: DSM has no ID or empty ID");
+      return;
+    }
+
+    // Check if DSM with same ID, path, or asset already exists
     const existingDSMs = currentState.project.metadata.dsm || [];
-    const existsById = existingDSMs.some((d) => d.id === dsm.id);
-    const existsByPath = existingDSMs.some((d) => d.path === dsm.path);
+    
+    // Normalize paths for comparison
+    const normalizePath = (path: string | undefined | null): string => {
+      if (!path) return '';
+      return path.replace(/\\/g, '/').toLowerCase().trim();
+    };
+    
+    const normalizedNewPath = normalizePath(dsm.path);
+    const normalizedNewAsset = normalizePath(dsm.asset);
+    
+    // Check for duplicates - more comprehensive check
+    const existsById = existingDSMs.some((d) => d.id && d.id.trim() !== '' && d.id === dsm.id);
+    const existsByPath = normalizedNewPath && normalizedNewPath !== '' && existingDSMs.some((d) => {
+      const normalizedExistingPath = normalizePath(d.path);
+      return normalizedExistingPath && normalizedExistingPath !== '' && normalizedExistingPath === normalizedNewPath;
+    });
+    const existsByAsset = normalizedNewAsset && normalizedNewAsset !== '' && existingDSMs.some((d) => {
+      const normalizedExistingAsset = normalizePath(d.asset);
+      return normalizedExistingAsset && normalizedExistingAsset !== '' && normalizedExistingAsset === normalizedNewAsset;
+    });
     
     if (existsById) {
       console.warn(`DSM with ID ${dsm.id} already exists, skipping add`);
@@ -157,6 +210,11 @@ class ProjectActions {
 
     if (existsByPath) {
       console.warn(`DSM with path ${dsm.path} already exists, skipping add`);
+      return;
+    }
+
+    if (existsByAsset) {
+      console.warn(`DSM with asset ${dsm.asset} already exists, skipping add`);
       return;
     }
 
@@ -188,12 +246,41 @@ class ProjectActions {
       return;
     }
 
-    // Check if orthophoto with same ID already exists
+    // Check if orthophoto with same ID, path, or asset already exists
     const existingOrthophotos = currentState.project.metadata.orthophoto || [];
-    const exists = existingOrthophotos.some((o) => o.id === orthophoto.id);
     
-    if (exists) {
+    // Normalize paths for comparison
+    const normalizePath = (path: string | undefined | null): string => {
+      if (!path) return '';
+      return path.replace(/\\/g, '/').toLowerCase().trim();
+    };
+    
+    const normalizedNewPath = normalizePath(orthophoto.path);
+    const normalizedNewAsset = normalizePath(orthophoto.asset);
+    
+    // Check for duplicates
+    const existsById = existingOrthophotos.some((o) => o.id === orthophoto.id);
+    const existsByPath = normalizedNewPath && existingOrthophotos.some((o) => {
+      const normalizedExistingPath = normalizePath(o.path);
+      return normalizedExistingPath === normalizedNewPath;
+    });
+    const existsByAsset = normalizedNewAsset && existingOrthophotos.some((o) => {
+      const normalizedExistingAsset = normalizePath(o.asset);
+      return normalizedExistingAsset === normalizedNewAsset;
+    });
+    
+    if (existsById) {
       console.warn(`Orthophoto with ID ${orthophoto.id} already exists, skipping add`);
+      return;
+    }
+
+    if (existsByPath) {
+      console.warn(`Orthophoto with path ${orthophoto.path} already exists, skipping add`);
+      return;
+    }
+
+    if (existsByAsset) {
+      console.warn(`Orthophoto with asset ${orthophoto.asset} already exists, skipping add`);
       return;
     }
 

@@ -94,9 +94,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   directoryExists: (dirPath: string) => {
     return ipcRenderer.invoke('directory-exists', dirPath);
   },
+  getFileSize: (filePath: string) => {
+    return ipcRenderer.invoke('get-file-size', filePath);
+  },
+  copyFile: (sourcePath: string, destinationPath: string) => {
+    return ipcRenderer.invoke('copy-file', sourcePath, destinationPath);
+  },
   // Path utilities
   pathJoin: (...paths: string[]) => {
     return path.join(...paths);
+  },
+  pathDirname: (filePath: string) => {
+    return path.dirname(filePath);
   },
 });
 

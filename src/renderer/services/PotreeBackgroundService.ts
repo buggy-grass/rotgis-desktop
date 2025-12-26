@@ -71,8 +71,6 @@ class PotreeBackgroundService {
     // Potree'nin render mekanizmasını patch et
     // Gradient-grid'i gradient gibi render et (sceneBG.render kullanarak)
     this.patchRenderFunction(viewer);
-
-    console.log('Gradient-grid background modu eklendi. Kullanım: viewer.setBackground("gradient-grid")');
   }
 
   /**

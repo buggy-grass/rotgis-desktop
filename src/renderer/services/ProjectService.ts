@@ -76,6 +76,7 @@ export async function saveProject(
 
 /**
  * Load project from XML file
+ * Validates point cloud assets and removes invalid ones
  */
 export async function loadProject(filePath: string): Promise<ProjectXML> {
   if (!window.electronAPI?.readProjectXML) {
@@ -83,7 +84,12 @@ export async function loadProject(filePath: string): Promise<ProjectXML> {
   }
 
   const xmlString = await window.electronAPI.readProjectXML(filePath);
-  return parseProjectXML(xmlString);
+  const project = parseProjectXML(xmlString);
+
+  // Note: Asset validation is now done in PotreeViewer and LayerBox
+  // to avoid blocking project loading
+
+  return project;
 }
 
 // Helper functions

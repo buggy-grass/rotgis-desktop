@@ -175,6 +175,11 @@ function parseMetadata(element: Element | null): Metadata {
       dtm: [],
     };
   }
+  
+  // Find the <dem> element first, then get DSM and DTM from within it
+  // This prevents selecting <dsm> tags that are inside <pointCloud> elements
+  const demElement = element.querySelector("dem");
+  
   return {
     mesh: Array.from(element.querySelectorAll("mesh")).map((mesh) =>
       parseMesh(mesh)
@@ -185,12 +190,18 @@ function parseMetadata(element: Element | null): Metadata {
     orthophoto: Array.from(element.querySelectorAll("orthophoto")).map(
       (orthophoto) => parseOrthophoto(orthophoto)
     ),
-    dsm: Array.from(element.querySelectorAll("dsm")).map((dsm) =>
-      parseOrthophoto(dsm)
-    ),
-    dtm: Array.from(element.querySelectorAll("dtm")).map((dtm) =>
-      parseOrthophoto(dtm)
-    ),
+    // Only get DSM from within <dem> element, not from <pointCloud> elements
+    dsm: demElement 
+      ? Array.from(demElement.querySelectorAll("dsm")).map((dsm) =>
+          parseOrthophoto(dsm)
+        )
+      : [],
+    // Only get DTM from within <dem> element, not from <pointCloud> elements
+    dtm: demElement
+      ? Array.from(demElement.querySelectorAll("dtm")).map((dtm) =>
+          parseOrthophoto(dtm)
+        )
+      : [],
   };
 }
 
@@ -218,14 +229,37 @@ function parsePointCloud(element: Element) {
   if (!element) {
     throw new Error("parsePointCloud: element is null");
   }
+  
+  // Parse center - XML has two separate <center> tags
+  const centerElements = element.querySelectorAll("center");
+  let center = { x: 0, y: 0 };
+  if (centerElements.length >= 2) {
+    center = {
+      x: getNumberContent(centerElements[0]),
+      y: getNumberContent(centerElements[1]),
+    };
+  } else if (centerElements.length === 1) {
+    // Fallback: try to parse as single element
+    center = parseCenter(centerElements[0]);
+  }
+  
+  // If center is 0,0, calculate from bbox
+  const bbox = parseBBox(element.querySelector("bbox"));
+  if (center.x === 0 && center.y === 0 && bbox.min.x !== 0 && bbox.max.x !== 0) {
+    center = {
+      x: (bbox.min.x + bbox.max.x) / 2,
+      y: (bbox.min.y + bbox.max.y) / 2,
+    };
+  }
+  
   return {
     id: getTextContent(element.querySelector("id")),
     name: getTextContent(element.querySelector("name")),
     fileType: "pc" as const,
     extension: getTextContent(element.querySelector("extension")),
     asset: getTextContent(element.querySelector("asset")),
-    bbox: parseBBox(element.querySelector("bbox")),
-    center: parseCenter(element.querySelector("center")),
+    bbox: bbox,
+    center: center,
     epsg: getTextContent(element.querySelector("epsg")),
     epsgText: getTextContent(element.querySelector("epsgText")),
     proj4: getTextContent(element.querySelector("proj4")),

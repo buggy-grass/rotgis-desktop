@@ -279,6 +279,25 @@ class PotreeService {
     }
   }
 
+  /**
+   * Set default viewer options
+   */
+  static setDefaultViewerOptions() {
+    if (!window.viewer) return;
+
+    // Set default values
+    PotreeService.setPointBudget(10000000);
+    PotreeService.setFieldofView(60);
+    PotreeService.setQuality(false);
+    PotreeService.setEdle(true);
+    PotreeService.setRadius(1.4);
+    PotreeService.setEDLStrength(0.4);
+    PotreeService.setEdleOpacity(1);
+    PotreeService.setNodeSize(30);
+    PotreeService.setPointSizeTypes(0);
+    window.viewer.setBackground("gradient-grid");
+  }
+
   static setElevationMin(id: string, value: number) {
     if (window.viewer) {
       const pointClouds = window.viewer.scene.pointclouds;
@@ -578,35 +597,33 @@ class PotreeService {
    */
   static focusToPointCloud(pointCloudId: string) {
     if (!window.viewer) {
-      console.warn("Viewer is not initialized");
       return;
     }
 
     const pointClouds = window.viewer.scene.pointclouds;
+    
     const pointCloud = pointClouds.find((pc: any) => pc.name === pointCloudId);
 
     if (!pointCloud) {
-      console.warn(`Point cloud with ID ${pointCloudId} not found in viewer`);
       return;
     }
 
-    // Use Potree's built-in zoomTo method directly on the point cloud
-    // This is the most reliable way to focus on a point cloud
+    // Use bounding box approach - same as zoomToBBox
     try {
-      window.viewer.zoomTo(pointCloud, 1.2, 500);
+      const bbox = window.viewer.getBoundingBox([pointCloud]);
+      if (bbox) {
+        const node = new window.THREE.Object3D();
+        node.boundingBox = bbox;
+        window.viewer.zoomTo(node, 1.0, 500);
+      } else {
+        // Fallback: direct zoom
+        window.viewer.zoomTo(pointCloud, 1.0, 500);
+      }
     } catch (error) {
-      console.error(`Error zooming to point cloud ${pointCloudId}:`, error);
-      
-      // Fallback: try using bounding box
+      // Last resort: direct zoom
       try {
-        const bbox = window.viewer.getBoundingBox([pointCloud]);
-        if (bbox) {
-          const node = new window.THREE.Object3D();
-          node.boundingBox = bbox;
-          window.viewer.zoomTo(node, 1.2, 500);
-        }
+        window.viewer.zoomTo(pointCloud, 1.0, 500);
       } catch (fallbackError) {
-        console.error(`Fallback zoom also failed for point cloud ${pointCloudId}:`, fallbackError);
       }
     }
   }

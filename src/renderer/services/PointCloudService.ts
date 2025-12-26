@@ -19,6 +19,77 @@ interface IntersectedObject {
 class PointCloudService {
   private static importingFiles = new Set<string>(); // Track currently importing files
 
+  /**
+   * Finds and reads metadata.json file from PotreeConverter output
+   * Tries multiple locations:
+   * 1. outputPath/metadata.json
+   * 2. outputPath/pc/{pointCloudId}/metadata.json
+   * 3. outputPath/pc/{pointCloudId}/{fileName}/metadata.json
+   *
+   * @param outputShortPath The output path where PotreeConverter created the files
+   * @param fileName The name of the point cloud file (without extension)
+   * @returns Object containing metadata content and the actual path where metadata.json was found
+   */
+  private static async findAndReadMetadata(
+    outputShortPath: string,
+    fileName: string
+  ): Promise<{ metadataContent: string; actualMetadataPath: string }> {
+    const pointCloudFolderPath = window.electronAPI.pathJoin(outputShortPath);
+    let metadataPath = window.electronAPI.pathJoin(
+      pointCloudFolderPath,
+      "metadata.json"
+    );
+
+    // Try location 1: outputPath/metadata.json
+    try {
+      const metadataContent = await window.electronAPI.readProjectXML(
+        metadataPath
+      );
+      console.log(`Found metadata.json at: ${metadataPath}`);
+      return { metadataContent, actualMetadataPath: metadataPath };
+    } catch (error) {
+      // Try location 2: outputPath/metadata.json (directly in output path)
+      metadataPath = window.electronAPI.pathJoin(
+        outputShortPath,
+        "metadata.json"
+      );
+      try {
+        const metadataContent = await window.electronAPI.readProjectXML(
+          metadataPath
+        );
+        console.log(`Found metadata.json at: ${metadataPath}`);
+        return { metadataContent, actualMetadataPath: metadataPath };
+      } catch (error2) {
+        // Try location 3: outputPath/{fileName}/metadata.json
+        const subfolderPath = window.electronAPI.pathJoin(
+          outputShortPath,
+          fileName
+        );
+        metadataPath = window.electronAPI.pathJoin(
+          subfolderPath,
+          "metadata.json"
+        );
+        try {
+          const metadataContent = await window.electronAPI.readProjectXML(
+            metadataPath
+          );
+          console.log(`Found metadata.json at: ${metadataPath}`);
+          return { metadataContent, actualMetadataPath: metadataPath };
+        } catch (error3) {
+          console.error(
+            "Could not find metadata.json in any expected location"
+          );
+          throw new Error(
+            `Failed to find metadata.json in any expected location. Tried:\n` +
+              `1. ${pointCloudFolderPath}/metadata.json\n` +
+              `2. ${outputShortPath}/metadata.json\n` +
+              `3. ${subfolderPath}/metadata.json`
+          );
+        }
+      }
+    }
+  }
+
   static async import(filePath: string) {
     // Prevent duplicate imports of the same file
     if (this.importingFiles.has(filePath)) {
@@ -31,7 +102,17 @@ class PointCloudService {
     this.importingFiles.add(filePath);
 
     try {
-      const shortPath = await WindowsAPI.generateShortPath(filePath);
+      const fileName =
+        filePath.substring(
+          filePath.lastIndexOf("\\") + 1,
+          filePath.lastIndexOf(".")
+        ) ||
+        filePath.substring(
+          filePath.lastIndexOf("/") + 1,
+          filePath.lastIndexOf(".")
+        ) ||
+        "pointcloud";
+
       const project = ProjectActions.getProjectState();
 
       if (!project.project?.project.path) {
@@ -48,7 +129,25 @@ class PointCloudService {
         "pc",
         pointCloudId
       );
-      const outputShortPath = await WindowsAPI.generateShortPath(outputPath);
+
+      const createOutputDirectory = await window.electronAPI.createProjectDirectory(outputPath);
+
+      const fileExtension =
+          filePath.substring(filePath.lastIndexOf(".")) || ".laz";
+        const destinationPath = window.electronAPI.pathJoin(
+          createOutputDirectory,
+          `${fileName}${fileExtension}`
+        );
+
+      try {
+        await window.electronAPI.copyFile(filePath, destinationPath);
+        console.log(`Successfully copied file to ${destinationPath}`);
+      } catch (error) {
+        console.error("Error copying original file:", error);
+      }
+
+      const outputShortPath = await WindowsAPI.generateShortPath(createOutputDirectory);
+      const shortPath = await WindowsAPI.generateShortPath(destinationPath);
 
       const result = await ShellCommandService.execute({
         command: await PathService.getPotreeConverterPath(),
@@ -67,30 +166,10 @@ class PointCloudService {
           ) ||
           "pointcloud";
 
-        const pointCloudFolderPath =
-          window.electronAPI.pathJoin(outputShortPath);
-        let metadataPath = window.electronAPI.pathJoin(
-          pointCloudFolderPath,
-          "metadata.json"
-        );
-
         try {
-          // Try to read metadata.json from point cloud folder
-          let metadataContent: string;
-          try {
-            metadataContent = await window.electronAPI.readProjectXML(
-              metadataPath
-            );
-          } catch (error) {
-            // If not found, try directly in output path
-            metadataPath = window.electronAPI.pathJoin(
-              outputShortPath,
-              "metadata.json"
-            );
-            metadataContent = await window.electronAPI.readProjectXML(
-              metadataPath
-            );
-          }
+          // Find and read metadata.json
+          const { metadataContent, actualMetadataPath } =
+            await this.findAndReadMetadata(outputShortPath, fileName);
 
           const metadata = JSON.parse(metadataContent);
 
@@ -172,6 +251,7 @@ class PointCloudService {
           } else {
             ProjectActions.addPointCloud(pointCloud);
             console.log("Point cloud added to project:", pointCloud);
+            // Focus will be handled automatically by PotreeViewer when it detects the new point cloud
           }
         } catch (error) {
           console.error("Error reading metadata.json:", error);
@@ -203,7 +283,12 @@ class PointCloudService {
             epsg: "4326",
             epsgText: "WGS 84",
             proj4: "+proj=longlat +datum=WGS84 +no_defs",
-            path: pointCloudFolderPath,
+            path: window.electronAPI.pathJoin(
+              "import",
+              "pc",
+              pointCloudId,
+              `${fileName}${fileExtension}`
+            ),
             import: true,
             numberOfPoints: 0,
             dsm: { exist: false, file: "", res: 0 },

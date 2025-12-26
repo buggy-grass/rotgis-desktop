@@ -27,9 +27,6 @@ export function LoadingDialog() {
         }}
       >
         <div className="flex flex-col items-center gap-4 py-4">
-          {/* Loading Spinner */}
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-
           {/* Progress Bar */}
           <div className="w-full space-y-2">
             <div className="flex justify-between items-center text-sm">

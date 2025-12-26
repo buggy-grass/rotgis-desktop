@@ -4,7 +4,14 @@ import { Check, ChevronRight, Circle } from "lucide-react"
 
 import { cn } from "../../lib/utils"
 
-const ContextMenu = ContextMenuPrimitive.Root
+// ContextMenu supports open and onOpenChange props for controlled mode
+// Using type assertion to ensure TypeScript recognizes all Root props
+const ContextMenu = ContextMenuPrimitive.Root as React.ComponentType<
+  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Root> & {
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+  }
+>
 
 const ContextMenuTrigger = ContextMenuPrimitive.Trigger
 

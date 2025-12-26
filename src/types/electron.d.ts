@@ -19,7 +19,7 @@ export interface ElectronAPI {
   openInExplorer: (filePath: string) => Promise<void>;
   readProjectXML: (filePath: string) => Promise<string>;
   writeProjectXML: (filePath: string, content: string) => Promise<void>;
-  createProjectDirectory: (dirPath: string) => Promise<void>;
+  createProjectDirectory: (dirPath: string) => Promise<string>;
   showFolderPicker: (options?: { defaultPath?: string }) => Promise<string | null>;
   showProjectFilePicker: (options?: { defaultPath?: string }) => Promise<string | null>;
   showFilePicker: (options: { 
@@ -39,7 +39,10 @@ export interface ElectronAPI {
   onCommandStderr: (callback: (line: string) => void) => void;
   removeCommandListeners: () => void;
   directoryExists: (dirPath: string) => Promise<boolean>;
+  getFileSize: (filePath: string) => Promise<number>;
+  copyFile: (sourcePath: string, destinationPath: string) => Promise<void>;
   pathJoin: (...paths: string[]) => string;
+  pathDirname: (filePath: string) => string;
 }
 
 declare global {
