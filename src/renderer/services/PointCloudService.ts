@@ -130,14 +130,15 @@ class PointCloudService {
         pointCloudId
       );
 
-      const createOutputDirectory = await window.electronAPI.createProjectDirectory(outputPath);
+      const createOutputDirectory =
+        await window.electronAPI.createProjectDirectory(outputPath);
 
       const fileExtension =
-          filePath.substring(filePath.lastIndexOf(".")) || ".laz";
-        const destinationPath = window.electronAPI.pathJoin(
-          createOutputDirectory,
-          `${fileName}${fileExtension}`
-        );
+        filePath.substring(filePath.lastIndexOf(".")) || ".laz";
+      const destinationPath = window.electronAPI.pathJoin(
+        createOutputDirectory,
+        `${fileName}${fileExtension}`
+      );
 
       try {
         await window.electronAPI.copyFile(filePath, destinationPath);
@@ -146,7 +147,9 @@ class PointCloudService {
         console.error("Error copying original file:", error);
       }
 
-      const outputShortPath = await WindowsAPI.generateShortPath(createOutputDirectory);
+      const outputShortPath = await WindowsAPI.generateShortPath(
+        createOutputDirectory
+      );
       const shortPath = await WindowsAPI.generateShortPath(destinationPath);
 
       const result = await ShellCommandService.execute({
@@ -249,8 +252,13 @@ class PointCloudService {
               `Point cloud with path ${pointCloud.path} already exists in project, skipping add`
             );
           } else {
-            ProjectActions.addPointCloud(pointCloud);
-            console.log("Point cloud added to project:", pointCloud);
+            // Ensure visible is set (default to true)
+            const pointCloudWithVisible = {
+              ...pointCloud,
+              visible: true,
+            };
+            ProjectActions.addPointCloud(pointCloudWithVisible);
+            console.log("Point cloud added to project:", pointCloudWithVisible);
             // Focus will be handled automatically by PotreeViewer when it detects the new point cloud
           }
         } catch (error) {
@@ -313,7 +321,12 @@ class PointCloudService {
               `Point cloud with path ${pointCloud.path} already exists in project, skipping add`
             );
           } else {
-            ProjectActions.addPointCloud(pointCloud);
+            // Ensure visible is set (default to true)
+            const pointCloudWithVisible = {
+              ...pointCloud,
+              visible: true,
+            };
+            ProjectActions.addPointCloud(pointCloudWithVisible);
           }
         }
       }
@@ -322,6 +335,42 @@ class PointCloudService {
     } finally {
       // Remove from importing set when done (success or failure)
       this.importingFiles.delete(filePath);
+    }
+  }
+
+  /**
+   * Set point cloud visibility
+   * Updates both the Potree viewer and the Redux store
+   * @param pointCloudId The ID of the point cloud
+   * @param visible The visibility state
+   */
+  static pointCloudVisibility(pointCloudId: string, visible: boolean) {
+    if (!window.viewer) {
+      console.warn("Potree viewer not available");
+      return;
+    }
+
+    const pointClouds = window.viewer.scene.pointclouds;
+    const existPointCloud = pointClouds.find(
+      (pointCloud: any) => pointCloud.name == pointCloudId
+    );
+  
+    if (existPointCloud) {
+      // Dronet projesindeki gibi direkt _visible set et
+      // Potree.js'te visible getter/setter var:
+      // - getter: return this._visible
+      // - setter: this._visible = value; dispatchEvent('visibility_changed')
+      // Render'da: visiblePointClouds.filter(pc => pc.visible) kullanılıyor
+      // PotreeViewer.tsx'te de visible setter kullanılıyor, tutarlılık için burada da kullanalım
+      console.error(existPointCloud)
+      existPointCloud._visible = visible; // Potree'nin setter'ını kullan (event dispatch ediyor)
+      
+      // Redux store'u güncelle
+      ProjectActions.updatePointCloudVisibility(pointCloudId, visible);
+      
+      console.log(`Point cloud ${pointCloudId} visibility set to ${visible} (Potree._visible: ${existPointCloud._visible})`);
+    } else {
+      console.warn(`Point cloud ${pointCloudId} not found in viewer`);
     }
   }
 

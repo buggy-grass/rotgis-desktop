@@ -60679,7 +60679,7 @@ void main() {
 			this.generateDEM = false;
 			this.profileRequests = [];
 			this.name = '';
-			this._visible = true;
+			this._visible = false;
 
 			{
 				let box = [this.pcoGeometry.tightBoundingBox, this.getBoundingBoxWorld()]
@@ -61706,6 +61706,7 @@ void main() {
 			if(value !== this._visible){
 				this._visible = value;
 
+				console.error("potree js visible", value)
 				this.dispatchEvent({type: 'visibility_changed', pointcloud: this});
 			}
 

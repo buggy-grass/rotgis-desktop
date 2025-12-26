@@ -84,7 +84,6 @@ const Viewer: React.FC<ViewerProps> = ({
                       actualHeight,
                       false
                     );
-                    window.viewer.update();
                   }
                 }
               }

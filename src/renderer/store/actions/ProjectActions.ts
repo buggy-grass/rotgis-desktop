@@ -74,14 +74,85 @@ class ProjectActions {
       return;
     }
 
+    // Ensure visible is set (default to true)
+    const pointCloudWithVisible = {
+      ...pointCloud,
+      visible: pointCloud.visible !== false,
+    };
+
     const updatedProject: ProjectXML = {
       ...currentState.project,
       metadata: {
         ...currentState.project.metadata,
         pointCloud: [
           ...existingPointClouds,
-          pointCloud,
+          pointCloudWithVisible,
         ],
+      },
+    };
+
+    store.dispatch({
+      type: "PROJECT/UPDATE_PROJECT",
+      payload: { project: updatedProject },
+    });
+  }
+
+  /**
+   * Update point cloud visibility
+   * @param pointCloudId The ID of the point cloud
+   * @param visible The visibility state
+   */
+  static updatePointCloudVisibility(pointCloudId: string, visible: boolean) {
+    const currentState = store.getState().projectReducer;
+    if (!currentState.project) {
+      console.error("Cannot update point cloud visibility: No project loaded");
+      return;
+    }
+
+    const existingPointClouds = currentState.project.metadata.pointCloud || [];
+    const updatedPointClouds = existingPointClouds.map((pc) => {
+      if (pc.id === pointCloudId) {
+        return {
+          ...pc,
+          visible: visible,
+        };
+      }
+      return pc;
+    });
+
+    const updatedProject: ProjectXML = {
+      ...currentState.project,
+      metadata: {
+        ...currentState.project.metadata,
+        pointCloud: updatedPointClouds,
+      },
+    };
+
+    store.dispatch({
+      type: "PROJECT/UPDATE_PROJECT",
+      payload: { project: updatedProject },
+    });
+  }
+
+  /**
+   * Delete a point cloud from the project
+   * @param pointCloudId The ID of the point cloud to delete
+   */
+  static deletePointCloud(pointCloudId: string) {
+    const currentState = store.getState().projectReducer;
+    if (!currentState.project) {
+      console.error("Cannot delete point cloud: No project loaded");
+      return;
+    }
+
+    const existingPointClouds = currentState.project.metadata.pointCloud || [];
+    const updatedPointClouds = existingPointClouds.filter((pc) => pc.id !== pointCloudId);
+
+    const updatedProject: ProjectXML = {
+      ...currentState.project,
+      metadata: {
+        ...currentState.project.metadata,
+        pointCloud: updatedPointClouds,
       },
     };
 

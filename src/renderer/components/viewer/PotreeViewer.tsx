@@ -341,6 +341,15 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       material.gradientValue = "SPECTRAL";
       window.viewer.setControls(window.viewer.earthControls);
 
+      // Set visibility from Redux store
+      const projectState = ProjectActions.getProjectState();
+      const pointCloudMetadata = projectState.project?.metadata?.pointCloud?.find((pc) => pc.id === id);
+      if (pointCloudMetadata) {
+        const shouldBeVisible = pointCloudMetadata.visible !== false; // Default to true
+        e.pointcloud._visible = shouldBeVisible;
+        console.log(`Point cloud ${id} loaded with visibility: ${shouldBeVisible}`);
+      }
+
       // Don't auto-zoom when loading - let user focus manually via LayerBox
       // window.viewer.zoomTo(e.pointcloud, 1.2);
 
@@ -434,6 +443,12 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       for (const pc of pointClouds) {
         // Skip if already loaded
         if (loadedPointCloudIds.has(pc.id)) {
+          // Update visibility for already loaded point clouds
+          const existingPointCloud = window.viewer.scene.pointclouds.find((p: any) => p.name === pc.id);
+          if (existingPointCloud) {
+            const shouldBeVisible = pc.visible !== false; // Default to true
+            existingPointCloud._visible = shouldBeVisible;
+          }
           continue;
         }
 
@@ -490,7 +505,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         setTimeout(() => {
           console.log(`Focusing on point cloud: ${focusId}`);
           PotreeService.focusToPointCloud(focusId!);
-        }, 1500); // Wait 1.5 seconds for point cloud to load
+        }, 500); // Wait 1.5 seconds for point cloud to load
       }
 
       // Update refs

@@ -99,10 +99,6 @@
     // Script'leri doğru sırayla yükle
     // 1. jQuery (zaten yüklendi)
     Promise.resolve()
-    .then(() => {
-        console.log('Loading jQuery UI...');
-        return loadScript(threejsPath);
-      })
       // 2. jQuery UI (jstree için gerekli)
       .then(() => {
         console.log('Loading jQuery UI...');
@@ -127,6 +123,10 @@
           loadScript(d3Path),
           loadScript(proj4Path)
         ]);
+      })
+      .then(() => {
+        console.log('Loading ThreeJS...');
+        return loadScript(threejsPath);
       })
       // 5. Potree (tüm bağımlılıklardan sonra)
       .then(() => {

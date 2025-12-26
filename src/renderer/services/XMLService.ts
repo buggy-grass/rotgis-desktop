@@ -271,6 +271,7 @@ function parsePointCloud(element: Element) {
       file: getTextContent(element.querySelector("dsm > file")),
       res: getNumberContent(element.querySelector("dsm > res")),
     },
+    visible: getBooleanContent(element.querySelector("visible"), true), // Default to true
   };
 }
 
@@ -385,6 +386,7 @@ function serializePointCloud(pc: any, indent: string): string {
   parts.push(
     `${indent}    <numberOfPoints>${pc.numberOfPoints}</numberOfPoints>`
   );
+  parts.push(`${indent}    <visible>${pc.visible !== false}</visible>`); // Default to true if not specified
   parts.push(`${indent}    <dsm>`);
   parts.push(`${indent}        <exist>${pc.dsm.exist}</exist>`);
   parts.push(`${indent}        <file>${escapeXML(pc.dsm.file)}</file>`);

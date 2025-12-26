@@ -64,6 +64,7 @@ export interface PointCloud {
   import: boolean;
   numberOfPoints: number;
   dsm: DSM;
+  visible?: boolean; // Default: true if not specified
 }
 
 export interface Orthophoto {

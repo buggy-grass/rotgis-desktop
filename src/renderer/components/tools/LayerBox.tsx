@@ -12,11 +12,12 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '../ui/context-menu';
-import { Layers as LayersIcon, Eye, EyeOff, Settings, Trash2, X, Info } from 'lucide-react';
+import { Layers as LayersIcon, Eye, EyeOff, Settings, X, Info, Trash2 } from 'lucide-react';
 import { RootState } from '../../store/store';
 import { PointCloud, Mesh, Orthophoto } from '../../types/ProjectTypes';
 import PotreeService from '../../services/PotreeService';
 import ProjectActions from '../../store/actions/ProjectActions';
+import PointCloudService from '../../services/PointCloudService';
 
 interface Layer {
   id: string;
@@ -36,7 +37,7 @@ interface LayersProps {}
 
 const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
   const project = useSelector((state: RootState) => state.projectReducer.project);
-  const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
+  // Note: layerVisibility is now managed through pointCloud.visible in Redux
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [selectedPointCloud, setSelectedPointCloud] = useState<PointCloud | null>(null);
   const [fileSize, setFileSize] = useState<number | null>(null);
@@ -88,13 +89,13 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
     layersArray.push({
       id: 'point-cloud-parent',
       name: 'Point Cloud Layer',
-      visible: layerVisibility['point-cloud-parent'] !== false,
+      visible: true, // Parent layers are always visible
       type: 'point-cloud',
       children: (validPointClouds && validPointClouds.length > 0) 
         ? validPointClouds.map((pc) => ({
             id: pc.id,
             name: pc.name,
-            visible: layerVisibility[pc.id] !== false,
+            visible: pc.visible !== false, // Use pointCloud.visible from Redux
             type: 'point-cloud',
             data: pc,
           }))
@@ -105,13 +106,13 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
     layersArray.push({
       id: 'mesh-parent',
       name: 'Mesh Layer',
-      visible: layerVisibility['mesh-parent'] !== false,
+      visible: true, // Parent layers are always visible
       type: 'mesh',
       children: (mesh && mesh.length > 0)
         ? mesh.map((m) => ({
             id: m.id,
             name: m.name,
-            visible: layerVisibility[m.id] !== false,
+            visible: true, // Default to true for other layer types
             type: 'mesh',
             data: m,
           }))
@@ -126,7 +127,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         ...orthophoto.map((ortho) => ({
           id: ortho.id,
           name: ortho.name,
-          visible: layerVisibility[ortho.id] !== false,
+          visible: true, // Default to true for other layer types
           type: 'orthophoto' as const,
           data: ortho,
         }))
@@ -138,7 +139,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         ...dsm.map((d) => ({
           id: d.id,
           name: d.name,
-          visible: layerVisibility[d.id] !== false,
+          visible: true, // Default to true for other layer types
           type: 'dsm' as const,
           data: d,
         }))
@@ -150,7 +151,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         ...dtm.map((d) => ({
           id: d.id,
           name: d.name,
-          visible: layerVisibility[d.id] !== false,
+          visible: true, // Default to true for other layer types
           type: 'dtm' as const,
           data: d,
         }))
@@ -161,13 +162,13 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
     layersArray.push({
       id: 'vector-parent',
       name: 'Vector Layer',
-      visible: layerVisibility['vector-parent'] !== false,
+      visible: true, // Parent layers are always visible
       type: 'orthophoto',
       children: vectorChildren,
     });
 
     return layersArray;
-  }, [project?.metadata, layerVisibility, validPointClouds]);
+  }, [project?.metadata, validPointClouds]);
 
   // Get all layer IDs that have children
   const getAllLayerIdsWithChildren = (items: Layer[]): string[] => {
@@ -192,11 +193,20 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
     },
   }), [layers]);
 
-  const toggleVisibility = (layerId: string) => {
-    setLayerVisibility((prev) => ({
-      ...prev,
-      [layerId]: prev[layerId] === undefined ? false : !prev[layerId],
-    }));
+  const toggleVisibility = (layerId: string, layerType: string) => {
+    if (layerType === 'point-cloud') {
+      // Get current visibility from Redux
+      const currentState = ProjectActions.getProjectState();
+      const pointCloud = currentState.project?.metadata.pointCloud?.find((pc) => pc.id === layerId);
+      const currentVisible = pointCloud?.visible !== false; // Default to true
+      
+      // Toggle visibility using PointCloudService
+      PointCloudService.pointCloudVisibility(layerId, !currentVisible);
+    } else {
+      // For other layer types, use local state (if needed in future)
+      // For now, just log
+      console.log(`Toggle visibility for ${layerType} layer ${layerId}`);
+    }
   };
 
   const handleAccordionChange = (layerId: string, value: string) => {
@@ -213,7 +223,10 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
 
   const renderLayer = (layer: Layer, level: number = 0): React.ReactNode => {
     const hasChildren = layer.children && layer.children.length > 0;
-    const isVisible = layerVisibility[layer.id] !== false; // Default to true if not set
+    // For point clouds, get visibility from Redux; for others, default to true
+    const isVisible = layer.type === 'point-cloud' && layer.data
+      ? (layer.data as PointCloud).visible !== false
+      : true;
 
     if (hasChildren) {
       const isExpanded = expandedItems.includes(layer.id);
@@ -238,7 +251,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                     className="h-5 w-5 p-0 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleVisibility(layer.id);
+                      toggleVisibility(layer.id, layer.type);
                     }}
                   >
                     {isVisible ? (
@@ -301,6 +314,24 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         }
       };
 
+      const handleDelete = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Close context menu
+        setContextMenuOpen(null);
+        
+        if (layer.type === 'point-cloud' && layer.data) {
+          const pc = layer.data as PointCloud;
+          
+          // Remove from Potree viewer
+          PotreeService.deletePointCloud(pc.id);
+          
+          // Remove from Redux store
+          ProjectActions.deletePointCloud(pc.id);
+        }
+      };
+
       return (
         <ContextMenu 
           key={layer.id} 
@@ -323,7 +354,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                 <div
                   className="h-5 w-5 p-0 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer"
-                  onClick={() => toggleVisibility(layer.id)}
+                  onClick={() => toggleVisibility(layer.id, layer.type)}
                 >
                   {isVisible ? (
                     <Eye className="h-3 w-3" />
@@ -339,14 +370,6 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                 >
                   <Settings className="h-3 w-3" />
                 </div>
-                <div
-                  className="h-5 w-5 p-0 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer text-destructive hover:text-destructive"
-                  onClick={() => {
-                    // Delete action
-                  }}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </div>
               </div>
             </div>
           </ContextMenuTrigger>
@@ -355,6 +378,10 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
               <ContextMenuItem onClick={handleShowProperties} className="text-xs">
                 <Info className="mr-2 h-3 w-3" />
                 Properties
+              </ContextMenuItem>
+              <ContextMenuItem onClick={handleDelete} className="text-xs text-destructive focus:text-destructive">
+                <Trash2 className="mr-2 h-3 w-3" />
+                Delete
               </ContextMenuItem>
             </ContextMenuContent>
           )}
