@@ -53912,7 +53912,7 @@
 		]);
 
 		let lineMaterial = new LineMaterial({ 
-			color: 0x00ff00, 
+			color: 0x00ff00, // Modern blue color matching UI 
 			dashSize: 5, 
 			gapSize: 2,
 			linewidth: 2, 
@@ -53931,7 +53931,7 @@
 	function createHeightLabel(){
 		const heightLabel = new TextSprite('');
 
-		heightLabel.setTextColor({r: 140, g: 250, b: 140, a: 1.0});
+		heightLabel.setTextColor({r: 140, g: 250, b: 140, a: 1.0}); // Modern blue color matching UI
 		heightLabel.setBorderColor({r: 0, g: 0, b: 0, a: 1.0});
 		heightLabel.setBackgroundColor({r: 0, g: 0, b: 0, a: 1.0});
 		heightLabel.fontsize = 16;
@@ -53945,7 +53945,7 @@
 	function createAreaLabel(){
 		const areaLabel = new TextSprite('');
 
-		areaLabel.setTextColor({r: 140, g: 250, b: 140, a: 1.0});
+		areaLabel.setTextColor({r: 140, g: 250, b: 140, a: 1.0}); // Modern blue color matching UI
 		areaLabel.setBorderColor({r: 0, g: 0, b: 0, a: 1.0});
 		areaLabel.setBackgroundColor({r: 0, g: 0, b: 0, a: 1.0});
 		areaLabel.fontsize = 16;
@@ -53959,7 +53959,7 @@
 	function createCircleRadiusLabel(){
 		const circleRadiusLabel = new TextSprite("");
 
-		circleRadiusLabel.setTextColor({r: 140, g: 250, b: 140, a: 1.0});
+		circleRadiusLabel.setTextColor({r: 59, g: 130, b: 246, a: 1.0}); // Modern blue color matching UI
 		circleRadiusLabel.setBorderColor({r: 0, g: 0, b: 0, a: 1.0});
 		circleRadiusLabel.setBackgroundColor({r: 0, g: 0, b: 0, a: 1.0});
 		circleRadiusLabel.fontsize = 16;
@@ -53979,7 +53979,7 @@
 		]);
 
 		const lineMaterial = new LineMaterial({ 
-			color: 0xff0000, 
+			color: 0x3b82f6, // Modern blue color matching UI 
 			linewidth: 2, 
 			resolution:  new Vector2(1000, 1000),
 			gapSize: 1,
@@ -54024,7 +54024,7 @@
 		geometry.setPositions(coordinates);
 
 		const material = new LineMaterial({ 
-			color: 0xff0000, 
+			color: 0x3b82f6, // Modern blue color matching UI
 			dashSize: 5, 
 			gapSize: 2,
 			linewidth: 2, 
@@ -54041,10 +54041,10 @@
 	}
 
 	function createCircleCenter(){
-		const sg = new SphereGeometry(1, 32, 32);
-		const sm = new MeshNormalMaterial();
+		const bg = new BoxGeometry(1, 1, 1);
+		const sm = new MeshLambertMaterial({ color: 0x3b82f6 });
 		
-		const circleCenter = new Mesh(sg, sm);
+		const circleCenter = new Mesh(bg, sm);
 		circleCenter.visible = false;
 
 		return circleCenter;
@@ -54059,7 +54059,7 @@
 		]);
 
 		const material = new LineMaterial({ 
-			color: 0xff0000, 
+			color: 0x3b82f6, // Modern blue color matching UI
 			linewidth: 2, 
 			resolution:  new Vector2(1000, 1000),
 			gapSize: 1,
@@ -54103,8 +54103,8 @@
 		const geometry = new LineGeometry();
 		geometry.setPositions(coordinates);
 
-		const material = new LineMaterial({ 
-			color: 0xff0000, 
+		const material = new LineMaterial({
+			color: 0x3b82f6, // Modern blue color matching UI
 			dashSize: 5, 
 			gapSize: 2,
 			linewidth: 2, 
@@ -54136,13 +54136,13 @@
 			node: null,
 		};
 
-		const sg = new SphereGeometry(1, 32, 32);
-		const sm = new MeshNormalMaterial();
+		const bg = new BoxGeometry(1, 1, 1);
+		const sm = new MeshLambertMaterial({ color: 0x3b82f6 });
 
 		{
 			const label = new TextSprite("");
 
-			label.setTextColor({r: 140, g: 250, b: 140, a: 1.0});
+			label.setTextColor({r: 59, g: 130, b: 246, a: 1.0}); // Modern blue color matching UI
 			label.setBorderColor({r: 0, g: 0, b: 0, a: 1.0});
 			label.setBackgroundColor({r: 0, g: 0, b: 0, a: 1.0});
 			label.fontsize = 16;
@@ -54152,9 +54152,9 @@
 			azimuth.label = label;
 		}
 
-		azimuth.center = new Mesh(sg, sm);
-		azimuth.target = new Mesh(sg, sm);
-		azimuth.north = new Mesh(sg, sm);
+		azimuth.center = new Mesh(bg, sm);
+		azimuth.target = new Mesh(bg, sm);
+		azimuth.north = new Mesh(bg, sm);
 		azimuth.centerToNorth = createLine();
 		azimuth.centerToTarget = createLine();
 		azimuth.centerToTargetground = createLine();
@@ -54194,10 +54194,10 @@
 			this._showHeight = false;
 			this._showEdges = true;
 			this._showAzimuth = false;
-			this.maxMarkers = Number.MAX_SAFE_INTEGER;
+		this.maxMarkers = Number.MAX_SAFE_INTEGER;
 
-			this.sphereGeometry = new SphereGeometry(0.4, 10, 10);
-			this.color = new Color(0xff0000);
+		this.markerGeometry = new BoxGeometry(0.6, 0.6, 0.6);
+		this.color = new Color(0x3b82f6); // Modern blue color matching UI
 
 			this.spheres = [];
 			this.edges = [];
@@ -54228,16 +54228,15 @@
 
 		}
 
-		createSphereMaterial () {
-			let sphereMaterial = new MeshLambertMaterial({
-				//shading: THREE.SmoothShading,
-				color: this.color,
-				depthTest: false,
-				depthWrite: false}
-			);
+	createMarkerMaterial () {
+		let markerMaterial = new MeshLambertMaterial({
+			color: this.color,
+			depthTest: false,
+			depthWrite: false
+		});
 
-			return sphereMaterial;
-		};
+		return markerMaterial;
+	};
 
 		addMarker (point) {
 			if (point.x != null) {
@@ -54247,8 +54246,8 @@
 			}
 			this.points.push(point);
 
-			// sphere
-			let sphere = new Mesh(this.sphereGeometry, this.createSphereMaterial());
+		// marker (box instead of sphere)
+		let sphere = new Mesh(this.markerGeometry, this.createMarkerMaterial());
 
 			this.add(sphere);
 			this.spheres.push(sphere);
@@ -54260,9 +54259,9 @@
 						0, 0, 0,
 				]);
 
-				let lineMaterial = new LineMaterial({
-					color: 0xff0000, 
-					linewidth: 2, 
+		let lineMaterial = new LineMaterial({
+			color: 0x3b82f6, // Modern blue color matching UI
+					linewidth: 1, 
 					resolution:  new Vector2(1000, 1000),
 				});
 
@@ -89481,8 +89480,8 @@ ENDSEC
 						0, 0, 0.05,
 					]);
 
-					let lineMaterial = new LineMaterial({ 
-						color: 0xff0000, 
+		let lineMaterial = new LineMaterial({
+			color: 0x3b82f6, // Modern blue color matching UI
 						linewidth: 2, 
 						resolution:  new Vector2(1000, 1000),
 					});
@@ -89532,8 +89531,8 @@ ENDSEC
 						0, 0, 0.05,
 					]);
 
-					let lineMaterial = new LineMaterial({ 
-						color: 0xff0000, 
+		let lineMaterial = new LineMaterial({
+			color: 0x3b82f6, // Modern blue color matching UI
 						linewidth: 2, 
 						resolution:  new Vector2(1000, 1000),
 					});
