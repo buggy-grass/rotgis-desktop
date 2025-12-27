@@ -417,6 +417,8 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const isLoadingMeasurementsRef = React.useRef(false);
   // Map to store pending measurements and their save timeouts
   const pendingMeasurementsRef = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
+  // Debounce map for marker moved updates (to avoid too frequent updates)
+  const markerMovedDebounceRef = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Listen to measurement events and save to Redux
   useEffect(() => {
@@ -699,14 +701,162 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       handleMeasurementAdded(event);
       // No need to add marker listeners - we wait for event emitter
     };
-    
+
+    // Helper function to update a measurement layer
+    const updateMeasurementLayerFromPotree = (potreeMeasurement: any, layer: any, pointCloudId: string) => {
+      // Clear existing debounce timeout for this measurement
+      const existingTimeout = markerMovedDebounceRef.current.get(layer.id);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
+
+      // Debounce the update (wait 300ms after last move event)
+      const timeout = setTimeout(() => {
+        // Update the measurement layer with new data from Potree
+        const measurementData = PotreeService.createMeasurementData(potreeMeasurement);
+        
+        // Calculate new extent from points
+        let minX = Infinity, minY = Infinity, minZ = Infinity;
+        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+        if (measurementData.points && measurementData.points.length > 0) {
+          measurementData.points.forEach((point: number[]) => {
+            minX = Math.min(minX, point[0]);
+            minY = Math.min(minY, point[1]);
+            minZ = Math.min(minZ, point[2]);
+            maxX = Math.max(maxX, point[0]);
+            maxY = Math.max(maxY, point[1]);
+            maxZ = Math.max(maxZ, point[2]);
+          });
+        } else {
+          minX = 0; minY = 0; minZ = 0;
+          maxX = 0; maxY = 0; maxZ = 0;
+        }
+
+        // Determine measurement type
+        let measurementType = "point";
+        if (measurementData.showArea) {
+          measurementType = "area";
+        } else if (measurementData.showDistances && measurementData.points && measurementData.points.length > 2) {
+          measurementType = "polygon";
+        } else if (measurementData.points && measurementData.points.length > 1) {
+          measurementType = "line";
+        }
+
+        // Get measurement icon
+        let iconPath: string | undefined;
+        if (measurementData.showHeight) {
+          iconPath = "RulerDimensionLine";
+        } else if (measurementData.showArea && measurementData.showDistances) {
+          iconPath = "VectorSquare";
+        } else if (measurementData.showDistances && !measurementData.showArea && !measurementData.showAngles) {
+          iconPath = "Spline";
+        } else if (measurementData.points && measurementData.points.length === 1) {
+          iconPath = "Circle";
+        } else if (measurementData.showAngles) {
+          iconPath = "Tangent";
+        } else if (measurementData.showArea) {
+          iconPath = "VectorSquare";
+        } else {
+          iconPath = "Spline";
+        }
+
+        const updatedMeasurementLayer = {
+          ...layer,
+          extent: {
+            min: { x: minX, y: minY, z: minZ },
+            max: { x: maxX, y: maxY, z: maxZ },
+          },
+          points: measurementData.points,
+          showDistances: measurementData.showDistances,
+          showArea: measurementData.showArea,
+          showCoordinates: measurementData.showCoordinates,
+          closed: measurementData.closed,
+          showAngles: measurementData.showAngles,
+          showHeight: measurementData.showHeight,
+          showCircle: measurementData.showCircle,
+          showAzimuth: measurementData.showAzimuth,
+          showEdges: measurementData.showEdges,
+          color: measurementData.color,
+          icon: iconPath,
+        };
+
+        ProjectActions.updateMeasurementLayer(pointCloudId, updatedMeasurementLayer);
+        
+        // Remove timeout from map after execution
+        markerMovedDebounceRef.current.delete(layer.id);
+      }, 300);
+
+      // Store timeout in map
+      markerMovedDebounceRef.current.set(layer.id, timeout);
+    };
+
+    // Handle marker moved event - update measurement when marker is moved
+    const handleMarkerMoved = (data: any) => {
+      if (isLoadingMeasurementsRef.current) {
+        return;
+      }
+
+      // Only handle measurement type marker moves (not height-profile)
+      if (data.type !== "measurement" || !data.measurement) {
+        return;
+      }
+
+      const potreeMeasurement = data.measurement;
+      const measurementId = potreeMeasurement.uuid;
+      if (!measurementId) return;
+
+      // Find the measurement layer in Redux
+      const pointClouds = project?.metadata?.pointCloud || [];
+      
+      for (const pc of pointClouds) {
+        if (!pc.layers) continue;
+        
+        const layer = pc.layers.find((l) => l.id === measurementId && l.type === "measurement");
+        
+        if (layer) {
+          updateMeasurementLayerFromPotree(potreeMeasurement, layer, pc.id);
+          break; // Found the layer, no need to continue
+        }
+      }
+    };
+
+    // Handle marker_dropped event from Potree scene (alternative method)
+    const handleMarkerDropped = (event: any) => {
+      if (isLoadingMeasurementsRef.current) {
+        return;
+      }
+
+      const potreeMeasurement = event.measurement;
+      if (!potreeMeasurement) return;
+
+      const measurementId = potreeMeasurement.uuid;
+      if (!measurementId) return;
+
+      // Find the measurement layer in Redux
+      const pointClouds = project?.metadata?.pointCloud || [];
+      
+      for (const pc of pointClouds) {
+        if (!pc.layers) continue;
+        
+        const layer = pc.layers.find((l) => l.id === measurementId && l.type === "measurement");
+        
+        if (layer) {
+          updateMeasurementLayerFromPotree(potreeMeasurement, layer, pc.id);
+          break; // Found the layer, no need to continue
+        }
+      }
+    };
+
     // Listen to event emitter for measurement finished events (primary method)
     if (window.eventBus) {
       window.eventBus.on("measurement-finished", handleMeasurementFinished);
+      window.eventBus.on("markerMoved", handleMarkerMoved);
     }
     
     window.viewer.scene.addEventListener("measurement_added", handleMeasurementAddedWithMarkerListener);
     window.viewer.scene.addEventListener("measurement_removed", handleMeasurementRemoved);
+    window.viewer.scene.addEventListener("marker_dropped", handleMarkerDropped);
     
     // No need to add marker listeners - we only save when measurement-finished event is emitted
 
@@ -714,10 +864,12 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       if (window.viewer && window.viewer.scene) {
         window.viewer.scene.removeEventListener("measurement_added", handleMeasurementAddedWithMarkerListener);
         window.viewer.scene.removeEventListener("measurement_removed", handleMeasurementRemoved);
+        window.viewer.scene.removeEventListener("marker_dropped", handleMarkerDropped);
         
         // Remove event emitter listener
         if (window.eventBus) {
           window.eventBus.off("measurement-finished", handleMeasurementFinished);
+          window.eventBus.off("markerMoved", handleMarkerMoved);
         }
         
         // Clear all pending timeouts
@@ -725,6 +877,12 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
           clearTimeout(timeout);
         });
         pendingMeasurementsRef.current.clear();
+        
+        // Clear all marker moved debounce timeouts
+        markerMovedDebounceRef.current.forEach((timeout) => {
+          clearTimeout(timeout);
+        });
+        markerMovedDebounceRef.current.clear();
       }
     };
   }, [window.viewer, isPotreeReady, project?.metadata?.pointCloud]);

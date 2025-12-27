@@ -253,37 +253,8 @@ function RibbonMenu() {
               }
               
               // Determine minimum points required based on measurement type
-              let minPoints = 1; // Default minimum
-              if (toolType === "Area") {
-                minPoints = 3; // Area needs at least 3 points to form a polygon
-              } else if (toolType === "Distance") {
-                minPoints = 2; // Distance needs at least 2 points for a line
-              } else if (toolType === "Angle") {
-                minPoints = 3; // Angle needs at least 3 points
-              } else if (toolType === "Height") {
-                minPoints = 2; // Height needs at least 2 points
-              }
-              
-              // For area measurements, wait and poll until measurement has enough points
-              // Potree.js callback fires before the last click is fully processed
-              if (toolType === "Area") {
-                let attempts = 0;
-                const maxAttempts = 20; // 20 attempts * 50ms = 1 second max wait
-                
-                while (attempts < maxAttempts) {
-                  await new Promise(resolve => setTimeout(resolve, 50));
-                  
-                  // Re-check measurement points count
-                  const currentPoints = measurement.points ? measurement.points.length : 0;
-                  
-                  // If we have enough points, measurement is complete
-                  if (currentPoints >= minPoints) {
-                    break;
-                  }
-                  
-                  attempts++;
-                }
-              }
+              // Height needs at least 2 points
+              const minPoints = 2;
               
               // Final check - only emit if measurement has minimum required points
               const finalPoints = measurement.points ? measurement.points.length : 0;
@@ -337,37 +308,8 @@ function RibbonMenu() {
               }
               
               // Determine minimum points required based on measurement type
-              let minPoints = 1; // Default minimum
-              if (toolType === "Area") {
-                minPoints = 3; // Area needs at least 3 points to form a polygon
-              } else if (toolType === "Distance") {
-                minPoints = 2; // Distance needs at least 2 points for a line
-              } else if (toolType === "Angle") {
-                minPoints = 3; // Angle needs at least 3 points
-              } else if (toolType === "Height") {
-                minPoints = 2; // Height needs at least 2 points
-              }
-              
-              // For area measurements, wait and poll until measurement has enough points
-              // Potree.js callback fires before the last click is fully processed
-              if (toolType === "Area") {
-                let attempts = 0;
-                const maxAttempts = 20; // 20 attempts * 50ms = 1 second max wait
-                
-                while (attempts < maxAttempts) {
-                  await new Promise(resolve => setTimeout(resolve, 50));
-                  
-                  // Re-check measurement points count
-                  const currentPoints = measurement.points ? measurement.points.length : 0;
-                  
-                  // If we have enough points, measurement is complete
-                  if (currentPoints >= minPoints) {
-                    break;
-                  }
-                  
-                  attempts++;
-                }
-              }
+              // Distance needs at least 2 points for a line
+              const minPoints = 2;
               
               // Final check - only emit if measurement has minimum required points
               const finalPoints = measurement.points ? measurement.points.length : 0;
@@ -419,36 +361,26 @@ function RibbonMenu() {
               }
               
               // Determine minimum points required based on measurement type
-              let minPoints = 1; // Default minimum
-              if (toolType === "Area") {
-                minPoints = 3; // Area needs at least 3 points to form a polygon
-              } else if (toolType === "Distance") {
-                minPoints = 2; // Distance needs at least 2 points for a line
-              } else if (toolType === "Angle") {
-                minPoints = 3; // Angle needs at least 3 points
-              } else if (toolType === "Height") {
-                minPoints = 2; // Height needs at least 2 points
-              }
+              // Area needs at least 3 points to form a polygon
+              const minPoints = 3;
               
               // For area measurements, wait and poll until measurement has enough points
               // Potree.js callback fires before the last click is fully processed
-              if (toolType === "Area") {
-                let attempts = 0;
-                const maxAttempts = 20; // 20 attempts * 50ms = 1 second max wait
+              let attempts = 0;
+              const maxAttempts = 20; // 20 attempts * 50ms = 1 second max wait
+              
+              while (attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 50));
                 
-                while (attempts < maxAttempts) {
-                  await new Promise(resolve => setTimeout(resolve, 50));
-                  
-                  // Re-check measurement points count
-                  const currentPoints = measurement.points ? measurement.points.length : 0;
-                  
-                  // If we have enough points, measurement is complete
-                  if (currentPoints >= minPoints) {
-                    break;
-                  }
-                  
-                  attempts++;
+                // Re-check measurement points count
+                const currentPoints = measurement.points ? measurement.points.length : 0;
+                
+                // If we have enough points, measurement is complete
+                if (currentPoints >= minPoints) {
+                  break;
                 }
+                
+                attempts++;
               }
               
               // Final check - only emit if measurement has minimum required points
@@ -503,37 +435,8 @@ function RibbonMenu() {
               }
               
               // Determine minimum points required based on measurement type
-              let minPoints = 1; // Default minimum
-              if (toolType === "Area") {
-                minPoints = 3; // Area needs at least 3 points to form a polygon
-              } else if (toolType === "Distance") {
-                minPoints = 2; // Distance needs at least 2 points for a line
-              } else if (toolType === "Angle") {
-                minPoints = 3; // Angle needs at least 3 points
-              } else if (toolType === "Height") {
-                minPoints = 2; // Height needs at least 2 points
-              }
-              
-              // For area measurements, wait and poll until measurement has enough points
-              // Potree.js callback fires before the last click is fully processed
-              if (toolType === "Area") {
-                let attempts = 0;
-                const maxAttempts = 20; // 20 attempts * 50ms = 1 second max wait
-                
-                while (attempts < maxAttempts) {
-                  await new Promise(resolve => setTimeout(resolve, 50));
-                  
-                  // Re-check measurement points count
-                  const currentPoints = measurement.points ? measurement.points.length : 0;
-                  
-                  // If we have enough points, measurement is complete
-                  if (currentPoints >= minPoints) {
-                    break;
-                  }
-                  
-                  attempts++;
-                }
-              }
+              // Angle needs at least 3 points
+              const minPoints = 3;
               
               // Final check - only emit if measurement has minimum required points
               const finalPoints = measurement.points ? measurement.points.length : 0;

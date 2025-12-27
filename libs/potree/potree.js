@@ -54356,7 +54356,8 @@
 						});
 						// dronet
 						window.eventBus.emit("markerMoved", {
-							type: "measurement"
+							type: "measurement",
+							measurement: this
 						  });
 					}
 				};

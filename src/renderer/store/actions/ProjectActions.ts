@@ -518,6 +518,62 @@ class ProjectActions {
   }
 
   /**
+   * Update a measurement layer with new data
+   * @param pointCloudId The ID of the point cloud
+   * @param measurementLayer The updated measurement layer
+   */
+  static updateMeasurementLayer(pointCloudId: string, measurementLayer: MeasurementLayer) {
+    const currentState = store.getState().projectReducer;
+    if (!currentState.project) {
+      console.error("Cannot update measurement layer: No project loaded");
+      return;
+    }
+
+    const existingPointClouds = currentState.project.metadata.pointCloud || [];
+    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+
+    if (pointCloudIndex === -1) {
+      console.error(`Cannot update measurement layer: Point cloud with ID ${pointCloudId} not found`);
+      return;
+    }
+
+    const pointCloud = existingPointClouds[pointCloudIndex];
+    const existingLayers = pointCloud.layers || [];
+
+    // Check if layer exists
+    const layerIndex = existingLayers.findIndex((layer) => layer.id === measurementLayer.id);
+    if (layerIndex === -1) {
+      console.warn(`Measurement layer with ID ${measurementLayer.id} not found, cannot update`);
+      return;
+    }
+
+    // Update the layer
+    const updatedLayers = [...existingLayers];
+    updatedLayers[layerIndex] = measurementLayer;
+
+    const updatedPointCloud = {
+      ...pointCloud,
+      layers: updatedLayers,
+    };
+
+    const updatedPointClouds = [...existingPointClouds];
+    updatedPointClouds[pointCloudIndex] = updatedPointCloud;
+
+    const updatedProject: ProjectXML = {
+      ...currentState.project,
+      metadata: {
+        ...currentState.project.metadata,
+        pointCloud: updatedPointClouds,
+      },
+    };
+
+    store.dispatch({
+      type: "PROJECT/UPDATE_PROJECT",
+      payload: { project: updatedProject },
+    });
+  }
+
+  /**
    * Remove a measurement layer from a point cloud
    * @param pointCloudId The ID of the point cloud
    * @param layerId The ID of the measurement layer to remove
