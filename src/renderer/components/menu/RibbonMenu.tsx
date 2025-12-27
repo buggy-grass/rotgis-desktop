@@ -101,6 +101,7 @@ function RibbonMenu() {
   const [activeTab, setActiveTab] = useState("measurement");
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [activeButtons, setActiveButtons] = useState<Record<string, boolean>>({});
+  const [selectedMeasureTool, setSelectedMeasureTool] = useState<string | null>(null);
   
   // Get project from store
   const projectState = useSelector((state: RootState) => state.projectReducer);
@@ -160,6 +161,122 @@ function RibbonMenu() {
     }
   };
 
+  const drawMeasurement = (toolType: string | null) => {
+    if (!toolType) {
+      stopMeasureInsertion();
+      return;
+    }
+
+    switch (toolType) {
+      case "Height":
+        if (window.viewer?.measuringTool) {
+          window.viewer.measuringTool.startInsertion(
+            {
+              showDistances: false,
+              showHeight: true,
+              showArea: false,
+              closed: false,
+              maxMarkers: 2,
+              name: "Height",
+            },
+            async function () {
+              await saveMeasurements();
+            }
+          );
+        }
+        break;
+      case "Distance":
+        if (window.viewer?.measuringTool) {
+          window.viewer.measuringTool.startInsertion(
+            {
+              showDistances: true,
+              showArea: false,
+              closed: false,
+              name: "Distance",
+            },
+            async function () {
+              await saveMeasurements();
+            }
+          );
+        }
+        break;
+      case "Area":
+        if (window.viewer?.measuringTool) {
+          window.viewer.measuringTool.startInsertion(
+            {
+              showDistances: true,
+              showArea: true,
+              closed: true,
+              name: "Area",
+            },
+            async function () {
+              await saveMeasurements();
+            }
+          );
+        }
+        break;
+      case "Angle":
+        if (window.viewer?.measuringTool) {
+          window.viewer.measuringTool.startInsertion(
+            {
+              showDistances: false,
+              showAngles: true,
+              showArea: false,
+              closed: true,
+              maxMarkers: 3,
+              name: "Angle",
+            },
+            async function () {
+              await saveMeasurements();
+            }
+          );
+        }
+        break;
+      default:
+        break;
+    }
+  };
+
+  const saveMeasurements = () => {
+    if (window.viewer && window.viewer.measuringTool) {
+      window.viewer.measuringTool.setNullActiveMeasure();
+    }
+    // Reset measurement tool selection and status bar after measurement is completed
+    setSelectedMeasureTool(null);
+    StatusBarActions.setOperation("Ready");
+  };
+
+  const stopMeasureInsertion = () => {
+    if (
+      window.viewer &&
+      window.viewer.measuringTool &&
+      window.viewer.measuringTool.activeMeasure != null
+    ) {
+      window.viewer.measuringTool.endInsertion();
+      window.viewer.measuringTool.setNullActiveMeasure();
+    }
+  };
+
+  const handleMeasurementToolClick = (toolType: string) => {
+    // If the same tool is already selected, deselect it
+    if (selectedMeasureTool === toolType) {
+      setSelectedMeasureTool(null);
+      stopMeasureInsertion();
+      StatusBarActions.setOperation("Ready");
+    } else {
+      // If a different tool is selected, stop it first
+      if (selectedMeasureTool) {
+        stopMeasureInsertion();
+      }
+      // Select the new tool
+      setSelectedMeasureTool(toolType);
+      drawMeasurement(toolType);
+      
+      // Update StatusBar with tool label
+      StatusBarActions.setOperation(toolType);
+    }
+  };
+
   const ribbonTabs: RibbonTab[] = [
     {
       value: "measurement",
@@ -169,9 +286,34 @@ function RibbonMenu() {
         {
           title: "Tools",
           buttons: [
-            { label: "Distance", icon: RulerIcon, variant: "ghost", toggle: true },
-            { label: "Area", icon: Grid3x3, variant: "ghost", toggle: true },
-            { label: "Volume", icon: Box, variant: "ghost", toggle: true },
+            { 
+              label: "Distance", 
+              icon: RulerIcon, 
+              variant: "ghost", 
+              toggle: true,
+              onClick: () => handleMeasurementToolClick("Distance")
+            },
+            { 
+              label: "Area", 
+              icon: Grid3x3, 
+              variant: "ghost", 
+              toggle: true,
+              onClick: () => handleMeasurementToolClick("Area")
+            },
+            { 
+              label: "Angle", 
+              icon: Box, 
+              variant: "ghost", 
+              toggle: true,
+              onClick: () => handleMeasurementToolClick("Angle")
+            },
+            { 
+              label: "Height", 
+              icon: Box, 
+              variant: "ghost", 
+              toggle: true,
+              onClick: () => handleMeasurementToolClick("Height")
+            },
           ],
         },
         {
@@ -305,12 +447,25 @@ function RibbonMenu() {
                 {group.buttons.map((button, buttonIndex) => {
                   const IconComponent = button.icon;
                   const buttonKey = `${tab.value}-${groupIndex}-${buttonIndex}`;
-                  const isActive = activeButtons[buttonKey] || false;
+                  // For measurement tools, check selectedMeasureTool state
+                  const isMeasurementTool = tab.value === "measurement" && group.title === "Tools";
+                  const isActive = isMeasurementTool 
+                    ? selectedMeasureTool === button.label
+                    : (activeButtons[buttonKey] || false);
                   const isToggle = button.toggle && (tab.value === "measurement" || tab.value === "drawing");
                   
                   const handleClick = () => {
                     if (isToggle) {
-                      // Toggle button state
+                      // For measurement tools, use special handling
+                      if (tab.value === "measurement" && group.title === "Tools") {
+                        // Call the onClick handler which handles measurement tool logic
+                        if (button.onClick) {
+                          button.onClick();
+                        }
+                        return;
+                      }
+                      
+                      // For other toggle buttons, use standard toggle logic
                       const newState = !isActive;
                       
                       // If activating this button, deactivate all other buttons in the same group
@@ -344,8 +499,8 @@ function RibbonMenu() {
                       }
                     }
                     
-                    // Call original onClick if provided
-                    if (button.onClick) {
+                    // Call original onClick if provided (for non-measurement tools)
+                    if (button.onClick && !(tab.value === "measurement" && group.title === "Tools")) {
                       button.onClick();
                     }
                   };
