@@ -9,7 +9,6 @@ import {
   LayersPlus,
   ListChevronsDownUp,
   ListChevronsUpDown,
-  Wrench,
   X,
 } from "lucide-react";
 import { Label } from "../ui/label";
@@ -94,9 +93,7 @@ function Toolbox() {
 
   const tablist = [
     { value: "layers", label: "Layers", icon: Layers },
-    { value: "folder_structure", label: "Folder Structure", icon: Folders },
-    { value: "point_cloud", label: "Point Cloud", icon: Wrench },
-    { value: "mesh", label: "Mesh", icon: Wrench },
+    { value: "folder_structure", label: "Folder Structure", icon: Folders }
   ];
 
   // Aktif tab değiştiğinde indicator'ı hareket ettir

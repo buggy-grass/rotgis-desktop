@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSelector } from 'react-redux';
-import { Minus, Square, X, TabletSmartphone } from 'lucide-react';
+import { Minus, Square, X, TabletSmartphone, Proportions } from 'lucide-react';
 import { Button } from './ui/button';
 import { RootState } from '../store/store';
 import { Menubar } from './ui/menubar';
@@ -140,7 +140,7 @@ export function WindowCustomBar() {
           onClick={handleMaximize}
         >
           {isMaximized ? (
-            <TabletSmartphone className="h-4 w-4" />
+            <Proportions className="h-4 w-4" />
           ) : (
             <Square className="h-3.5 w-3.5" />
           )}

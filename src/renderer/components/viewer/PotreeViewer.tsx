@@ -3,7 +3,8 @@ import { useSelector } from "react-redux";
 import PointCloudService from "../../services/PointCloudService";
 import StatusBarActions from "../../store/actions/StatusBarActions";
 import PotreeService from "../../services/PotreeService";
-import PotreeBackgroundService from "../../services/PotreeBackgroundService";
+// PotreeBackgroundService artık potree.js içinde yapılıyor
+// import PotreeBackgroundService from "../../services/PotreeBackgroundService";
 import FPSMeter from "../FPSMeter";
 import Compass from "../Compass";
 import OrbitController from "../OrbitController";
@@ -11,7 +12,7 @@ import { RootState } from "../../store/store";
 import "../../services/EventEmitter";
 import ProjectActions from "../../store/actions/ProjectActions";
 import PotreeViewerSettingsPanel from "./PotreeViewerSettingsPanel";
-import { Settings } from "lucide-react";
+import { MonitorCog, Settings } from "lucide-react";
 import { Button } from "../ui/button";
 
 const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
@@ -168,12 +169,10 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
           }
         }
 
-        // Gradient-grid background modunu ekle
-        PotreeBackgroundService.setupGradientGridBackground(window.viewer);
-
-        window.viewer.renderer.setClearColor(0x1f1f1f, 1);
-        // Gradient-grid background'u aktif et
-        window.viewer.setBackground("gradient-grid");
+        // Background ayarları artık potree.js içinde yapılıyor (constructor'da)
+        // PotreeBackgroundService.setupGradientGridBackground(window.viewer);
+        // window.viewer.renderer.setClearColor(0x1f1f1f, 1);
+        // window.viewer.setBackground("gradient-grid");
       });
     } catch (error) {
       console.error(error);
@@ -626,7 +625,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
               className="h-8 w-8 p-0 bg-[#262626] border-[#404040] hover:bg-[#404040] hover:border-[#505050]"
               title="Viewer Settings"
             >
-              <Settings className="h-4 w-4 text-[#e5e5e5]" />
+              <MonitorCog className="h-4 w-4 text-[#e5e5e5]" />
             </Button>
             
             {/* Settings Panel */}

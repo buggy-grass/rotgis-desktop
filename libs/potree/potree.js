@@ -60679,7 +60679,7 @@ void main() {
 			this.generateDEM = false;
 			this.profileRequests = [];
 			this.name = '';
-			this._visible = false;
+			this._visible = true;
 
 			{
 				let box = [this.pcoGeometry.tightBoundingBox, this.getBoundingBoxWorld()]
@@ -61706,7 +61706,6 @@ void main() {
 			if(value !== this._visible){
 				this._visible = value;
 
-				console.error("potree js visible", value)
 				this.dispatchEvent({type: 'visibility_changed', pointcloud: this});
 			}
 
@@ -72116,6 +72115,8 @@ void main() {
 				renderer.setClearColor(0xff0000, 1);
 			}else if(viewer.background === "gradient"){
 				renderer.setClearColor(0x00ff00, 1);
+			}else if(viewer.background === "gradient-grid"){
+				renderer.setClearColor(0x000000, 0);
 			}else if(viewer.background === "black"){
 				renderer.setClearColor(0x000000, 1);
 			}else if(viewer.background === "white"){
@@ -90114,9 +90115,14 @@ ENDSEC
 			
 			this.skybox = null;
 			this.clock = new Clock();
-			this.background = null;
+			this.background = 'gradient-grid'; // Default background'u gradient-grid olarak ayarla
 
 			this.initThree();
+			
+			// Renderer'ın clear color'ını hemen ayarla (ilk render'dan önce)
+			if (this.renderer) {
+				this.renderer.setClearColor(0x1f1f1f, 1);
+			}
 
 			if(args.noDragAndDrop){
 				
@@ -90236,6 +90242,9 @@ ENDSEC
 
 			// dronet
 			{ // set defaults
+				// Background'u en başta ayarla (ilk render'dan önce)
+				this.background = 'gradient-grid';
+				
 				this.setFOV(60);
 				this.setEDLEnabled(true);
 				this.setEDLRadius(1.4);
@@ -90248,7 +90257,99 @@ ENDSEC
 				this.setShowBoundingBox(false);
 				this.setFreeze(false);
 				this.setControls(this.orbitControls);
-				this.setBackground('solid');
+				
+				// Gradient-grid background setup (PotreeBackgroundService'ten)
+				{ // setup gradient-grid background
+					// SceneBG ve cameraBG oluştur
+					if (!this.scene.sceneBG) {
+						this.scene.sceneBG = new Scene();
+					}
+					if (!this.scene.cameraBG) {
+						this.scene.cameraBG = new Camera();
+					}
+					
+					// Gradient skybox texture oluştur
+					const createGradientSkyboxTexture = (width, height) => {
+						const size = width * height;
+						const data = new Uint8Array(3 * size); // RGB
+						
+						// Gradient renkleri (üst: siyah, alt: koyu gri) - siyahtan griye geçiş
+						const topColor = { r: 32, g: 32, b: 32 }; // Siyah (üst)
+						const bottomColor = { r: 32, g: 32, b: 32 }; // Koyu gri (alt - siyaha yakın)
+						
+						// Perfect smooth gradient - çizgisiz geçiş için
+						for (let x = 0; x < width; x++) {
+							for (let y = 0; y < height; y++) {
+								const i = x + width * y;
+								
+								// Y pozisyonuna göre gradient (y=0 üst, y=height alt)
+								const t = (y + 5) / height; // 0-1 arası
+								
+								// Pure linear interpolation (en smooth, easing yok - çizgi yok)
+								const r = topColor.r * (1 - t) + bottomColor.r * t;
+								const g = topColor.g * (1 - t) + bottomColor.g * t;
+								const b = topColor.b * (1 - t) + bottomColor.b * t;
+								
+								// Yuvarlama (high precision ile çizgi olmaz)
+								data[3 * i + 0] = Math.round(r);
+								data[3 * i + 1] = Math.round(g);
+								data[3 * i + 2] = Math.round(b);
+							}
+						}
+						
+						const texture = new DataTexture(data, width, height, RGBFormat);
+						texture.needsUpdate = true;
+						
+						// Smooth gradient için filtering ayarları
+						texture.minFilter = LinearFilter;
+						texture.magFilter = LinearFilter;
+						texture.generateMipmaps = false; // Mipmap'e gerek yok, smooth gradient için
+						texture.wrapS = ClampToEdgeWrapping;
+						texture.wrapT = ClampToEdgeWrapping;
+						
+						return texture;
+					};
+					
+					const gradientTexture = createGradientSkyboxTexture(4096, 4096);
+					
+					// Eski gradient-grid elemanlarını temizle
+					const existingSkybox = this.scene.sceneBG.getObjectByName('gradient_skybox');
+					const existingGrid = this.scene.sceneBG.getObjectByName('grid_ground');
+					if (existingSkybox) this.scene.sceneBG.remove(existingSkybox);
+					if (existingGrid) this.scene.sceneBG.remove(existingGrid);
+					
+					// Gradient skybox için plane (arka plan) - tüm ekranı kaplasın
+					const skyboxPlane = new Mesh(
+						new PlaneGeometry(2, 2, 1),
+						new MeshBasicMaterial({
+							map: gradientTexture,
+							depthTest: false,
+							depthWrite: false,
+							side: DoubleSide,
+						})
+					);
+					skyboxPlane.name = 'gradient_skybox';
+					skyboxPlane.position.z = -1; // Arka planda
+					
+					// Yeni skybox plane'i ekle (gradient skybox)
+					this.scene.sceneBG.add(skyboxPlane);
+					
+					// Background modunu extend et
+					const originalSetBackground = this.setBackground.bind(this);
+					this.setBackground = function(bg) {
+						if (bg === 'gradient-grid') {
+							this.background = 'gradient-grid';
+							this.dispatchEvent({ type: 'background_changed', viewer: this });
+						} else {
+							originalSetBackground(bg);
+						}
+					};
+				}
+				
+				// Clear color ve background ayarla
+				this.renderer.setClearColor(0x1f1f1f, 1);
+				this.setBackground('gradient-grid');
+				
 				this.setDescription("");
 				this.scaleFactor = 1;
 
