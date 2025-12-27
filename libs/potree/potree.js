@@ -65229,6 +65229,8 @@ void main() {
 			// objects: createSceneContentData(viewer),
 		};
 
+		console.error(data);
+
 		return data;
 	}
 

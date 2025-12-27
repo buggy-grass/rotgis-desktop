@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { makeUseStyles } from '../../styles/makeUseStyles';
 import { Button } from "../ui/button";
 import {
@@ -29,6 +29,10 @@ import {
   Eye,
   EyeOff,
   LucideIcon,
+  Spline,
+  Tangent,
+  VectorSquare,
+  RulerDimensionLine,
 } from "lucide-react";
 import { SaveProjectDialog } from '../dialogs/SaveProjectDialog';
 import ProjectService from '../../services/ProjectService';
@@ -102,6 +106,7 @@ function RibbonMenu() {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [activeButtons, setActiveButtons] = useState<Record<string, boolean>>({});
   const [selectedMeasureTool, setSelectedMeasureTool] = useState<string | null>(null);
+  const pendingMeasurementRef = useRef<any>(null);
   
   // Get project from store
   const projectState = useSelector((state: RootState) => state.projectReducer);
@@ -161,6 +166,60 @@ function RibbonMenu() {
     }
   };
 
+  // Listen to measurement_removed event to detect when measurement is cancelled
+  useEffect(() => {
+    if (!window.viewer || !window.viewer.scene) {
+      return;
+    }
+
+    const handleMeasurementRemoved = (event: any) => {
+      const measurement = event.measurement;
+      if (!measurement) return;
+
+      // If this is the pending measurement that was just cancelled, close toggle button
+      if (pendingMeasurementRef.current === measurement || 
+          (pendingMeasurementRef.current && pendingMeasurementRef.current.uuid === measurement.uuid)) {
+        setSelectedMeasureTool(null);
+        StatusBarActions.setOperation("Ready");
+        pendingMeasurementRef.current = null;
+      }
+    };
+    
+    // Also check if activeMeasure is cleared (for cases where measurement is removed but event doesn't fire)
+    // This is especially important for Distance measurement where callback might not fire
+    const checkActiveMeasure = () => {
+      if (pendingMeasurementRef.current && selectedMeasureTool) {
+        const isActiveMeasureNull = window.viewer?.measuringTool?.activeMeasure === null;
+        const measurementStillInScene = window.viewer?.scene?.measurements?.find(
+          (m: any) => m === pendingMeasurementRef.current || 
+                      (pendingMeasurementRef.current?.uuid && m.uuid === pendingMeasurementRef.current.uuid)
+        );
+        
+        // If activeMeasure is null and measurement is not in scene, it was cancelled
+        if (isActiveMeasureNull && !measurementStillInScene) {
+          // Measurement was removed but event didn't fire, close toggle button
+          setSelectedMeasureTool(null);
+          StatusBarActions.setOperation("Ready");
+          pendingMeasurementRef.current = null;
+        }
+      }
+    };
+    
+    // Poll for activeMeasure changes (fallback mechanism for Distance and other measurements)
+    const pollInterval = setInterval(checkActiveMeasure, 200);
+
+    window.viewer.scene.addEventListener("measurement_removed", handleMeasurementRemoved);
+
+    return () => {
+      if (window.viewer && window.viewer.scene) {
+        window.viewer.scene.removeEventListener("measurement_removed", handleMeasurementRemoved);
+      }
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, []);
+
   const drawMeasurement = (toolType: string | null) => {
     if (!toolType) {
       stopMeasureInsertion();
@@ -170,7 +229,7 @@ function RibbonMenu() {
     switch (toolType) {
       case "Height":
         if (window.viewer?.measuringTool) {
-          window.viewer.measuringTool.startInsertion(
+          const measureHeight = window.viewer.measuringTool.startInsertion(
             {
               showDistances: false,
               showHeight: true,
@@ -180,14 +239,81 @@ function RibbonMenu() {
               name: "Height",
             },
             async function () {
+              // Get measurement reference
+              let measurement = null;
+              if (window.viewer?.measuringTool?.activeMeasure) {
+                measurement = window.viewer.measuringTool.activeMeasure;
+              } else if (window.viewer?.scene?.measurements && window.viewer.scene.measurements.length > 0) {
+                measurement = window.viewer.scene.measurements[window.viewer.scene.measurements.length - 1];
+              }
+              
+              if (!measurement) {
+                await saveMeasurements();
+                return;
+              }
+              
+              // Determine minimum points required based on measurement type
+              let minPoints = 1; // Default minimum
+              if (toolType === "Area") {
+                minPoints = 3; // Area needs at least 3 points to form a polygon
+              } else if (toolType === "Distance") {
+                minPoints = 2; // Distance needs at least 2 points for a line
+              } else if (toolType === "Angle") {
+                minPoints = 3; // Angle needs at least 3 points
+              } else if (toolType === "Height") {
+                minPoints = 2; // Height needs at least 2 points
+              }
+              
+              // For area measurements, wait and poll until measurement has enough points
+              // Potree.js callback fires before the last click is fully processed
+              if (toolType === "Area") {
+                let attempts = 0;
+                const maxAttempts = 20; // 20 attempts * 50ms = 1 second max wait
+                
+                while (attempts < maxAttempts) {
+                  await new Promise(resolve => setTimeout(resolve, 50));
+                  
+                  // Re-check measurement points count
+                  const currentPoints = measurement.points ? measurement.points.length : 0;
+                  
+                  // If we have enough points, measurement is complete
+                  if (currentPoints >= minPoints) {
+                    break;
+                  }
+                  
+                  attempts++;
+                }
+              }
+              
+              // Final check - only emit if measurement has minimum required points
+              const finalPoints = measurement.points ? measurement.points.length : 0;
+              if (finalPoints >= minPoints && window.eventBus) {
+                window.eventBus.emit("measurement-finished", { measurement });
+                pendingMeasurementRef.current = null; // Clear pending reference
+              } else {
+                // If not enough points, cancel/remove the measurement
+                // Store reference to detect removal
+                pendingMeasurementRef.current = measurement;
+                if (window.viewer?.measuringTool?.activeMeasure === measurement) {
+                  window.viewer.measuringTool.setNullActiveMeasure();
+                }
+                if (window.viewer?.scene) {
+                  window.viewer.scene.removeMeasurement(measurement);
+                }
+                // Reset will be handled by measurement_removed event listener
+              }
+              
               await saveMeasurements();
             }
           );
+          if (measureHeight) {
+            pendingMeasurementRef.current = measureHeight;
+          }
         }
         break;
       case "Distance":
         if (window.viewer?.measuringTool) {
-          window.viewer.measuringTool.startInsertion(
+          const measure = window.viewer.measuringTool.startInsertion(
             {
               showDistances: true,
               showArea: false,
@@ -195,14 +321,83 @@ function RibbonMenu() {
               name: "Distance",
             },
             async function () {
+              // Get measurement reference
+              let measurement = null;
+              if (window.viewer?.measuringTool?.activeMeasure) {
+                measurement = window.viewer.measuringTool.activeMeasure;
+              } else if (window.viewer?.scene?.measurements && window.viewer.scene.measurements.length > 0) {
+                measurement = window.viewer.scene.measurements[window.viewer.scene.measurements.length - 1];
+              }
+
+              console.error(measurement)
+              
+              if (!measurement) {
+                await saveMeasurements();
+                return;
+              }
+              
+              // Determine minimum points required based on measurement type
+              let minPoints = 1; // Default minimum
+              if (toolType === "Area") {
+                minPoints = 3; // Area needs at least 3 points to form a polygon
+              } else if (toolType === "Distance") {
+                minPoints = 2; // Distance needs at least 2 points for a line
+              } else if (toolType === "Angle") {
+                minPoints = 3; // Angle needs at least 3 points
+              } else if (toolType === "Height") {
+                minPoints = 2; // Height needs at least 2 points
+              }
+              
+              // For area measurements, wait and poll until measurement has enough points
+              // Potree.js callback fires before the last click is fully processed
+              if (toolType === "Area") {
+                let attempts = 0;
+                const maxAttempts = 20; // 20 attempts * 50ms = 1 second max wait
+                
+                while (attempts < maxAttempts) {
+                  await new Promise(resolve => setTimeout(resolve, 50));
+                  
+                  // Re-check measurement points count
+                  const currentPoints = measurement.points ? measurement.points.length : 0;
+                  
+                  // If we have enough points, measurement is complete
+                  if (currentPoints >= minPoints) {
+                    break;
+                  }
+                  
+                  attempts++;
+                }
+              }
+              
+              // Final check - only emit if measurement has minimum required points
+              const finalPoints = measurement.points ? measurement.points.length : 0;
+              if (finalPoints >= minPoints && window.eventBus) {
+                window.eventBus.emit("measurement-finished", { measurement });
+                pendingMeasurementRef.current = null; // Clear pending reference
+              } else {
+                // If not enough points, cancel/remove the measurement
+                // Store reference to detect removal
+                pendingMeasurementRef.current = measurement;
+                if (window.viewer?.measuringTool?.activeMeasure === measurement) {
+                  window.viewer.measuringTool.setNullActiveMeasure();
+                }
+                if (window.viewer?.scene) {
+                  window.viewer.scene.removeMeasurement(measurement);
+                }
+                // Reset will be handled by measurement_removed event listener
+              }
+              
               await saveMeasurements();
             }
           );
+          if (measure) {
+            pendingMeasurementRef.current = measure;
+          }
         }
         break;
       case "Area":
         if (window.viewer?.measuringTool) {
-          window.viewer.measuringTool.startInsertion(
+          const measureArea = window.viewer.measuringTool.startInsertion(
             {
               showDistances: true,
               showArea: true,
@@ -210,14 +405,81 @@ function RibbonMenu() {
               name: "Area",
             },
             async function () {
+              // Get measurement reference
+              let measurement = null;
+              if (window.viewer?.measuringTool?.activeMeasure) {
+                measurement = window.viewer.measuringTool.activeMeasure;
+              } else if (window.viewer?.scene?.measurements && window.viewer.scene.measurements.length > 0) {
+                measurement = window.viewer.scene.measurements[window.viewer.scene.measurements.length - 1];
+              }
+              
+              if (!measurement) {
+                await saveMeasurements();
+                return;
+              }
+              
+              // Determine minimum points required based on measurement type
+              let minPoints = 1; // Default minimum
+              if (toolType === "Area") {
+                minPoints = 3; // Area needs at least 3 points to form a polygon
+              } else if (toolType === "Distance") {
+                minPoints = 2; // Distance needs at least 2 points for a line
+              } else if (toolType === "Angle") {
+                minPoints = 3; // Angle needs at least 3 points
+              } else if (toolType === "Height") {
+                minPoints = 2; // Height needs at least 2 points
+              }
+              
+              // For area measurements, wait and poll until measurement has enough points
+              // Potree.js callback fires before the last click is fully processed
+              if (toolType === "Area") {
+                let attempts = 0;
+                const maxAttempts = 20; // 20 attempts * 50ms = 1 second max wait
+                
+                while (attempts < maxAttempts) {
+                  await new Promise(resolve => setTimeout(resolve, 50));
+                  
+                  // Re-check measurement points count
+                  const currentPoints = measurement.points ? measurement.points.length : 0;
+                  
+                  // If we have enough points, measurement is complete
+                  if (currentPoints >= minPoints) {
+                    break;
+                  }
+                  
+                  attempts++;
+                }
+              }
+              
+              // Final check - only emit if measurement has minimum required points
+              const finalPoints = measurement.points ? measurement.points.length : 0;
+              if (finalPoints >= minPoints && window.eventBus) {
+                window.eventBus.emit("measurement-finished", { measurement });
+                pendingMeasurementRef.current = null; // Clear pending reference
+              } else {
+                // If not enough points, cancel/remove the measurement
+                // Store reference to detect removal
+                pendingMeasurementRef.current = measurement;
+                if (window.viewer?.measuringTool?.activeMeasure === measurement) {
+                  window.viewer.measuringTool.setNullActiveMeasure();
+                }
+                if (window.viewer?.scene) {
+                  window.viewer.scene.removeMeasurement(measurement);
+                }
+                // Reset will be handled by measurement_removed event listener
+              }
+              
               await saveMeasurements();
             }
           );
+          if (measureArea) {
+            pendingMeasurementRef.current = measureArea;
+          }
         }
         break;
       case "Angle":
         if (window.viewer?.measuringTool) {
-          window.viewer.measuringTool.startInsertion(
+          const measureAngle = window.viewer.measuringTool.startInsertion(
             {
               showDistances: false,
               showAngles: true,
@@ -227,9 +489,76 @@ function RibbonMenu() {
               name: "Angle",
             },
             async function () {
+              // Get measurement reference
+              let measurement = null;
+              if (window.viewer?.measuringTool?.activeMeasure) {
+                measurement = window.viewer.measuringTool.activeMeasure;
+              } else if (window.viewer?.scene?.measurements && window.viewer.scene.measurements.length > 0) {
+                measurement = window.viewer.scene.measurements[window.viewer.scene.measurements.length - 1];
+              }
+              
+              if (!measurement) {
+                await saveMeasurements();
+                return;
+              }
+              
+              // Determine minimum points required based on measurement type
+              let minPoints = 1; // Default minimum
+              if (toolType === "Area") {
+                minPoints = 3; // Area needs at least 3 points to form a polygon
+              } else if (toolType === "Distance") {
+                minPoints = 2; // Distance needs at least 2 points for a line
+              } else if (toolType === "Angle") {
+                minPoints = 3; // Angle needs at least 3 points
+              } else if (toolType === "Height") {
+                minPoints = 2; // Height needs at least 2 points
+              }
+              
+              // For area measurements, wait and poll until measurement has enough points
+              // Potree.js callback fires before the last click is fully processed
+              if (toolType === "Area") {
+                let attempts = 0;
+                const maxAttempts = 20; // 20 attempts * 50ms = 1 second max wait
+                
+                while (attempts < maxAttempts) {
+                  await new Promise(resolve => setTimeout(resolve, 50));
+                  
+                  // Re-check measurement points count
+                  const currentPoints = measurement.points ? measurement.points.length : 0;
+                  
+                  // If we have enough points, measurement is complete
+                  if (currentPoints >= minPoints) {
+                    break;
+                  }
+                  
+                  attempts++;
+                }
+              }
+              
+              // Final check - only emit if measurement has minimum required points
+              const finalPoints = measurement.points ? measurement.points.length : 0;
+              if (finalPoints >= minPoints && window.eventBus) {
+                window.eventBus.emit("measurement-finished", { measurement });
+                pendingMeasurementRef.current = null; // Clear pending reference
+              } else {
+                // If not enough points, cancel/remove the measurement
+                // Store reference to detect removal
+                pendingMeasurementRef.current = measurement;
+                if (window.viewer?.measuringTool?.activeMeasure === measurement) {
+                  window.viewer.measuringTool.setNullActiveMeasure();
+                }
+                if (window.viewer?.scene) {
+                  window.viewer.scene.removeMeasurement(measurement);
+                }
+                // Reset will be handled by measurement_removed event listener
+              }
+              
               await saveMeasurements();
             }
           );
+          if (measureAngle) {
+            pendingMeasurementRef.current = measureAngle;
+          }
         }
         break;
       default:
@@ -272,8 +601,27 @@ function RibbonMenu() {
       setSelectedMeasureTool(toolType);
       drawMeasurement(toolType);
       
-      // Update StatusBar with tool label
-      StatusBarActions.setOperation(toolType);
+      // Get icon name for StatusBar based on tool type
+      let iconName: string | undefined;
+      switch (toolType) {
+        case "Distance":
+          iconName = "Spline";
+          break;
+        case "Area":
+          iconName = "VectorSquare";
+          break;
+        case "Angle":
+          iconName = "Tangent";
+          break;
+        case "Height":
+          iconName = "RulerDimensionLine";
+          break;
+        default:
+          iconName = undefined;
+      }
+      
+      // Update StatusBar with tool label and icon
+      StatusBarActions.setOperation(toolType, iconName);
     }
   };
 
@@ -288,28 +636,28 @@ function RibbonMenu() {
           buttons: [
             { 
               label: "Distance", 
-              icon: RulerIcon, 
+              icon: Spline, 
               variant: "ghost", 
               toggle: true,
               onClick: () => handleMeasurementToolClick("Distance")
             },
             { 
               label: "Area", 
-              icon: Grid3x3, 
+              icon: VectorSquare, 
               variant: "ghost", 
               toggle: true,
               onClick: () => handleMeasurementToolClick("Area")
             },
             { 
               label: "Angle", 
-              icon: Box, 
+              icon: Tangent, 
               variant: "ghost", 
               toggle: true,
               onClick: () => handleMeasurementToolClick("Angle")
             },
             { 
               label: "Height", 
-              icon: Box, 
+              icon: RulerDimensionLine, 
               variant: "ghost", 
               toggle: true,
               onClick: () => handleMeasurementToolClick("Height")

@@ -619,13 +619,98 @@ class PotreeService {
         // Fallback: direct zoom
         window.viewer.zoomTo(pointCloud, 1.0, 500);
       }
+      
+      // Store the active point cloud ID in a global variable for measurement tracking
+      (window as any).activePointCloudId = pointCloudId;
     } catch (error) {
       // Last resort: direct zoom
       try {
         window.viewer.zoomTo(pointCloud, 1.0, 500);
+        (window as any).activePointCloudId = pointCloudId;
       } catch (fallbackError) {
       }
     }
+  }
+
+  /**
+   * Focus to a measurement by its extent (bounding box)
+   * @param extent The bounding box of the measurement
+   */
+  static focusToMeasure(extent: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }) {
+    if (!window.viewer) {
+      return;
+    }
+
+    try {
+      const threebbox = new window.THREE.Box3();
+      threebbox.min.set(extent.min.x, extent.min.y, extent.min.z);
+      threebbox.max.set(extent.max.x, extent.max.y, extent.max.z);
+
+      const node = new window.THREE.Object3D();
+      node.boundingBox = threebbox;
+      window.viewer.zoomTo(node, 1.0, 500);
+    } catch (error) {
+      console.error("Error focusing to measurement:", error);
+    }
+  }
+
+  /**
+   * Create measurement data from measurement object (similar to createMeasurementData in potree.js)
+   * @param measurement The measurement object from Potree
+   * @returns Measurement data object ready for saving
+   */
+  static createMeasurementData(measurement: any): {
+    uuid: string;
+    name: string;
+    points: number[][];
+    visible: boolean;
+    showDistances: boolean;
+    showCoordinates: boolean;
+    showArea: boolean;
+    closed: boolean;
+    showAngles: boolean;
+    showHeight: boolean;
+    showCircle: boolean;
+    showAzimuth: boolean;
+    showEdges: boolean;
+    color: number[];
+  } {
+    console.error(measurement);
+    // Extract points - handle both position.toArray() and position object
+    const points: number[][] = measurement.points.map((p: any) => p.position.toArray())
+
+    console.error(points);
+
+    // Extract color - handle both color.toArray() and color object
+    let color: number[] = [1, 1, 0]; // Default yellow
+    if (measurement.color) {
+      if (measurement.color.toArray && typeof measurement.color.toArray === "function") {
+        color = measurement.color.toArray();
+      } else if (Array.isArray(measurement.color)) {
+        color = measurement.color;
+      } else if (measurement.color.r !== undefined) {
+        color = [measurement.color.r, measurement.color.g || 0, measurement.color.b || 0];
+      }
+    }
+
+    const data = {
+      uuid: measurement.uuid,
+      name: measurement.name,
+      points: points,
+      visible: measurement.visible,
+      showDistances: measurement.showDistances,
+      showCoordinates: measurement.showCoordinates,
+      showArea: measurement.showArea,
+      closed: measurement.closed,
+      showAngles: measurement.showAngles,
+      showHeight: measurement.showHeight,
+      showCircle: measurement.showCircle,
+      showAzimuth: measurement.showAzimuth,
+      showEdges: measurement.showEdges,
+      color: color,
+    };
+
+    return data;
   }
 }
 export default PotreeService;

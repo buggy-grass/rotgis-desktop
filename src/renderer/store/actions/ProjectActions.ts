@@ -1,6 +1,6 @@
 import IProjectState from "../../models/IProjectState";
 import store from "../store";
-import { ProjectXML, PointCloud, Mesh, Orthophoto } from "../../types/ProjectTypes";
+import { ProjectXML, PointCloud, Mesh, Orthophoto, MeasurementLayer } from "../../types/ProjectTypes";
 
 class ProjectActions {
   static getProjectState(): IProjectState {
@@ -400,6 +400,160 @@ class ProjectActions {
           ...existingMeshes,
           mesh,
         ],
+      },
+    };
+
+    store.dispatch({
+      type: "PROJECT/UPDATE_PROJECT",
+      payload: { project: updatedProject },
+    });
+  }
+
+  /**
+   * Add a measurement layer to a point cloud
+   * @param pointCloudId The ID of the point cloud
+   * @param measurementLayer The measurement layer to add
+   */
+  static addMeasurementLayer(pointCloudId: string, measurementLayer: MeasurementLayer) {
+    const currentState = store.getState().projectReducer;
+    if (!currentState.project) {
+      console.error("Cannot add measurement layer: No project loaded");
+      return;
+    }
+
+    const existingPointClouds = currentState.project.metadata.pointCloud || [];
+    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+
+    if (pointCloudIndex === -1) {
+      console.error(`Cannot add measurement layer: Point cloud with ID ${pointCloudId} not found`);
+      return;
+    }
+
+    const pointCloud = existingPointClouds[pointCloudIndex];
+    const existingLayers = pointCloud.layers || [];
+
+    // Check if layer with same ID already exists
+    const existsById = existingLayers.some((layer) => layer.id === measurementLayer.id);
+    if (existsById) {
+      console.warn(`Measurement layer with ID ${measurementLayer.id} already exists, skipping add`);
+      return;
+    }
+
+    const updatedPointCloud = {
+      ...pointCloud,
+      layers: [...existingLayers, measurementLayer],
+    };
+
+    const updatedPointClouds = [...existingPointClouds];
+    updatedPointClouds[pointCloudIndex] = updatedPointCloud;
+
+    const updatedProject: ProjectXML = {
+      ...currentState.project,
+      metadata: {
+        ...currentState.project.metadata,
+        pointCloud: updatedPointClouds,
+      },
+    };
+
+    store.dispatch({
+      type: "PROJECT/UPDATE_PROJECT",
+      payload: { project: updatedProject },
+    });
+  }
+
+  /**
+   * Update measurement layer visibility
+   * @param pointCloudId The ID of the point cloud
+   * @param layerId The ID of the measurement layer
+   * @param visible The visibility state
+   */
+  static updateMeasurementLayerVisibility(
+    pointCloudId: string,
+    layerId: string,
+    visible: boolean
+  ) {
+    const currentState = store.getState().projectReducer;
+    if (!currentState.project) {
+      console.error("Cannot update measurement layer visibility: No project loaded");
+      return;
+    }
+
+    const existingPointClouds = currentState.project.metadata.pointCloud || [];
+    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+
+    if (pointCloudIndex === -1) {
+      console.error(`Cannot update measurement layer: Point cloud with ID ${pointCloudId} not found`);
+      return;
+    }
+
+    const pointCloud = existingPointClouds[pointCloudIndex];
+    const existingLayers = pointCloud.layers || [];
+    const updatedLayers = existingLayers.map((layer) => {
+      if (layer.id === layerId) {
+        return { ...layer, visible };
+      }
+      return layer;
+    });
+
+    const updatedPointCloud = {
+      ...pointCloud,
+      layers: updatedLayers,
+    };
+
+    const updatedPointClouds = [...existingPointClouds];
+    updatedPointClouds[pointCloudIndex] = updatedPointCloud;
+
+    const updatedProject: ProjectXML = {
+      ...currentState.project,
+      metadata: {
+        ...currentState.project.metadata,
+        pointCloud: updatedPointClouds,
+      },
+    };
+
+    store.dispatch({
+      type: "PROJECT/UPDATE_PROJECT",
+      payload: { project: updatedProject },
+    });
+  }
+
+  /**
+   * Remove a measurement layer from a point cloud
+   * @param pointCloudId The ID of the point cloud
+   * @param layerId The ID of the measurement layer to remove
+   */
+  static removeMeasurementLayer(pointCloudId: string, layerId: string) {
+    const currentState = store.getState().projectReducer;
+    if (!currentState.project) {
+      console.error("Cannot remove measurement layer: No project loaded");
+      return;
+    }
+
+    const existingPointClouds = currentState.project.metadata.pointCloud || [];
+    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+
+    if (pointCloudIndex === -1) {
+      console.error(`Cannot remove measurement layer: Point cloud with ID ${pointCloudId} not found`);
+      return;
+    }
+
+    const pointCloud = existingPointClouds[pointCloudIndex];
+    const existingLayers = pointCloud.layers || [];
+    const updatedLayers = existingLayers.filter((layer) => layer.id !== layerId);
+
+    const updatedPointCloud = {
+      ...pointCloud,
+      layers: updatedLayers,
+    };
+
+    const updatedPointClouds = [...existingPointClouds];
+    updatedPointClouds[pointCloudIndex] = updatedPointCloud;
+
+    const updatedProject: ProjectXML = {
+      ...currentState.project,
+      metadata: {
+        ...currentState.project.metadata,
+        pointCloud: updatedPointClouds,
       },
     };
 

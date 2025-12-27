@@ -12,6 +12,12 @@ const iconNameMap: Record<string, keyof typeof Icons> = {
   "Pencil": "Pencil",
   "Move": "Move",
   "RotateCw": "RotateCw",
+  // Measurement icons from RibbonMenu
+  "Spline": "Spline", // Distance
+  "VectorSquare": "VectorSquare", // Area
+  "Tangent": "Tangent", // Angle
+  "RulerDimensionLine": "RulerDimensionLine", // Height
+  "Circle": "Circle", // Point
 };
 
 function StatusBar() {
@@ -28,7 +34,12 @@ function StatusBar() {
   return (
     <div className="h-5 text-xs border-t border-border text-foreground flex items-center justify-between px-4 text-sm select-none">
         <div className="flex items-center gap-1.5">
-          {IconComponent && <IconComponent className="h-3 w-3" />}
+          {IconComponent && (
+            <IconComponent 
+              className="h-3 w-3" 
+              style={operation.icon === "RulerDimensionLine" ? { transform: "rotate(90deg)" } : undefined}
+            />
+          )}
           <span>{operation.name}</span>
         </div>
         <div>{coordinates.x != 0 ? `${coordinates.x}, ${coordinates.y}, ${coordinates.z}` : ""}</div>

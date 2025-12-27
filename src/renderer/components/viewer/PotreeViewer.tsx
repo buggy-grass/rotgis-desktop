@@ -411,6 +411,323 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   // Track if this is the first load (for initial focus)
   const isFirstLoadRef = React.useRef(true);
   const previousPointCloudCountRef = React.useRef(0);
+  // Track the currently active/focused point cloud
+  const activePointCloudIdRef = React.useRef<string | null>(null);
+  // Flag to prevent event listener from adding measurements during loading
+  const isLoadingMeasurementsRef = React.useRef(false);
+  // Map to store pending measurements and their save timeouts
+  const pendingMeasurementsRef = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Listen to measurement events and save to Redux
+  useEffect(() => {
+    if (!window.viewer || !window.viewer.scene) {
+      return;
+    }
+
+    // Function to save measurement to Redux
+    const saveMeasurementToRedux = (measurement: any) => {
+      const pointClouds = project?.metadata?.pointCloud || [];
+      if (pointClouds.length === 0) return;
+
+      // Check if measurement has valid points (not all 0,0,0)
+      const measurementData = PotreeService.createMeasurementData(measurement);
+      const hasValidPoints = measurementData.points.some((point: number[]) => {
+        return point[0] !== 0 || point[1] !== 0 || point[2] !== 0;
+      });
+
+      // Don't save if points are all 0,0,0 (drawing not finished)
+      if (!hasValidPoints && measurementData.points.length > 0) {
+        return;
+      }
+
+      // For Height and Angle measurements, check if maxMarkers is reached
+      // Height: maxMarkers = 2, Angle: maxMarkers = 3
+      const measurementName = measurement.name || measurementData.name || "";
+      const isHeight = measurementName === "Height" || measurement.showHeight;
+      const isAngle = measurementName === "Angle" || measurement.showAngles;
+      
+      if (isHeight || isAngle) {
+        const maxMarkers = measurement.maxMarkers || (isHeight ? 2 : 3);
+        const currentPoints = measurement.points ? measurement.points.length : measurementData.points.length;
+        
+        // Don't save if maxMarkers is not reached (drawing not finished)
+        if (currentPoints < maxMarkers) {
+          return;
+        }
+      }
+
+      // Find which point cloud contains the measurement based on point positions
+      // Priority: 1) Active point cloud, 2) Point cloud that contains all measurement points, 3) First visible point cloud
+      let targetPointCloudId: string | null = null;
+      
+      if (measurementData.points && measurementData.points.length > 0 && hasValidPoints) {
+        // First, check if active point cloud contains the measurement
+        const activePcId = activePointCloudIdRef.current || ((window as any).activePointCloudId || null);
+        if (activePcId) {
+          const activePcMetadata = pointClouds.find((pc) => pc.id === activePcId);
+          if (activePcMetadata) {
+            const pcBbox = activePcMetadata.bbox;
+            let allPointsInside = true;
+            for (const point of measurementData.points) {
+              if (
+                point[0] < pcBbox.min.x || point[0] > pcBbox.max.x ||
+                point[1] < pcBbox.min.y || point[1] > pcBbox.max.y ||
+                point[2] < pcBbox.min.z || point[2] > pcBbox.max.z
+              ) {
+                allPointsInside = false;
+                break;
+              }
+            }
+            if (allPointsInside) {
+              targetPointCloudId = activePcId;
+            }
+          }
+        }
+        
+        // If active point cloud doesn't contain it, find the point cloud that contains all points
+        if (!targetPointCloudId) {
+          for (const pc of pointClouds) {
+            const pcBbox = pc.bbox;
+            let allPointsInside = true;
+            for (const point of measurementData.points) {
+              if (
+                point[0] < pcBbox.min.x || point[0] > pcBbox.max.x ||
+                point[1] < pcBbox.min.y || point[1] > pcBbox.max.y ||
+                point[2] < pcBbox.min.z || point[2] > pcBbox.max.z
+              ) {
+                allPointsInside = false;
+                break;
+              }
+            }
+            if (allPointsInside) {
+              targetPointCloudId = pc.id;
+              break;
+            }
+          }
+        }
+        
+        // If no point cloud contains all points, find the one that contains the most points
+        if (!targetPointCloudId) {
+          let maxPointsInside = 0;
+          for (const pc of pointClouds) {
+            const pcBbox = pc.bbox;
+            let pointsInside = 0;
+            for (const point of measurementData.points) {
+              if (
+                point[0] >= pcBbox.min.x && point[0] <= pcBbox.max.x &&
+                point[1] >= pcBbox.min.y && point[1] <= pcBbox.max.y &&
+                point[2] >= pcBbox.min.z && point[2] <= pcBbox.max.z
+              ) {
+                pointsInside++;
+              }
+            }
+            if (pointsInside > maxPointsInside) {
+              maxPointsInside = pointsInside;
+              targetPointCloudId = pc.id;
+            }
+          }
+        }
+      }
+      
+      // Last fallback: use active point cloud or first visible point cloud
+      if (!targetPointCloudId) {
+        targetPointCloudId = activePointCloudIdRef.current || ((window as any).activePointCloudId || null);
+        if (!targetPointCloudId) {
+          const loadedPointClouds = window.viewer.scene.pointclouds || [];
+          for (const loadedPc of loadedPointClouds) {
+            if (loadedPc._visible !== false) {
+              targetPointCloudId = loadedPc.name;
+              break;
+            }
+          }
+        }
+        // Ultimate fallback: first point cloud
+        if (!targetPointCloudId && pointClouds.length > 0) {
+          targetPointCloudId = pointClouds[0].id;
+        }
+      }
+
+      if (!targetPointCloudId) return;
+
+      // Calculate measurement extent from points
+      let minX = Infinity, minY = Infinity, minZ = Infinity;
+      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+      if (measurementData.points && measurementData.points.length > 0) {
+        measurementData.points.forEach((point: number[]) => {
+          minX = Math.min(minX, point[0]);
+          minY = Math.min(minY, point[1]);
+          minZ = Math.min(minZ, point[2]);
+          maxX = Math.max(maxX, point[0]);
+          maxY = Math.max(maxY, point[1]);
+          maxZ = Math.max(maxZ, point[2]);
+        });
+      } else {
+        // Set default extent if no points
+        minX = 0; minY = 0; minZ = 0;
+        maxX = 0; maxY = 0; maxZ = 0;
+      }
+
+      // Determine measurement type from measurement properties
+      let measurementType = "point";
+      if (measurementData.showArea) {
+        measurementType = "area";
+      } else if (measurementData.showDistances && measurementData.points && measurementData.points.length > 2) {
+        measurementType = "polygon";
+      } else if (measurementData.points && measurementData.points.length > 1) {
+        measurementType = "line";
+      }
+
+      // Create measurement layer
+      const extent = {
+        min: { x: minX, y: minY, z: minZ },
+        max: { x: maxX, y: maxY, z: maxZ },
+      };
+
+      // Get measurement icon based on measurement properties (using RibbonMenu icon names)
+      let iconPath: string | undefined;
+      // Determine icon based on measurement type
+      if (measurementData.showHeight) {
+        iconPath = "RulerDimensionLine"; // Height
+      } else if (measurementData.showArea && measurementData.showDistances) {
+        iconPath = "VectorSquare"; // Area
+      } else if (measurementData.showDistances && !measurementData.showArea && !measurementData.showAngles) {
+        iconPath = "Spline"; // Distance
+      } else if (measurementData.points && measurementData.points.length === 1) {
+        iconPath = "Circle"; // Point
+      } else if (measurementData.showAngles) {
+        iconPath = "Tangent"; // Angle
+      } else if (measurementData.showArea) {
+        iconPath = "VectorSquare"; // Area
+      } else {
+        iconPath = "Spline"; // Distance (default)
+      }
+
+      const measurementLayer = {
+        id: measurementData.uuid || `measurement-${Date.now()}`,
+        name: measurementData.name || `Measurement ${measurementType}`,
+        type: "measurement" as const,
+        visible: measurementData.visible !== false,
+        extent: extent,
+        measurementType: measurementType,
+        pointCloudId: targetPointCloudId,
+        points: measurementData.points,
+        showDistances: measurementData.showDistances,
+        showArea: measurementData.showArea,
+        showCoordinates: measurementData.showCoordinates,
+        closed: measurementData.closed,
+        showAngles: measurementData.showAngles,
+        showHeight: measurementData.showHeight,
+        showCircle: measurementData.showCircle,
+        showAzimuth: measurementData.showAzimuth,
+        showEdges: measurementData.showEdges,
+        color: measurementData.color,
+        icon: iconPath,
+      };
+
+      ProjectActions.addMeasurementLayer(targetPointCloudId, measurementLayer);
+    };
+
+    // Handle measurement finished event from event emitter (called when drawing is complete)
+    const handleMeasurementFinished = (data: any) => {
+      if (isLoadingMeasurementsRef.current) {
+        return;
+      }
+
+      const measurement = data.measurement;
+      if (!measurement) return;
+
+      const measurementId = measurement.uuid;
+      if (!measurementId) return;
+
+      // Clear any pending timeout for this measurement
+      const existingTimeout = pendingMeasurementsRef.current.get(measurementId);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+        pendingMeasurementsRef.current.delete(measurementId);
+      }
+
+      // Save measurement immediately since drawing is confirmed finished
+      saveMeasurementToRedux(measurement);
+    };
+
+    const handleMeasurementAdded = (event: any) => {
+      // Skip if we're currently loading measurements from project (to avoid duplicates)
+      if (isLoadingMeasurementsRef.current) {
+        return;
+      }
+
+      const measurement = event.measurement;
+      if (!measurement) return;
+
+      // Don't save here - wait for measurement-finished event from event emitter
+      // This event is fired when measurement drawing is actually complete
+      // No timeout here to prevent premature saving
+    };
+
+    // Listen to marker_added events (for tracking, but don't save based on this)
+    // We only save when measurement-finished event is emitted from event emitter
+    const handleMarkerAdded = (event: any) => {
+      // Don't save here - wait for measurement-finished event from event emitter
+      // This is just for tracking purposes if needed in the future
+    };
+
+
+    const handleMeasurementRemoved = (event: any) => {
+      const measurement = event.measurement;
+      if (!measurement) return;
+
+      const measurementId = measurement.uuid || measurement.id;
+      if (!measurementId) return;
+
+      // Find and remove the measurement layer from all point clouds
+      const pointClouds = project?.metadata?.pointCloud || [];
+      for (const pc of pointClouds) {
+        if (pc.layers) {
+          const layer = pc.layers.find((l) => l.id === measurementId);
+          if (layer) {
+            ProjectActions.removeMeasurementLayer(pc.id, measurementId);
+            break;
+          }
+        }
+      }
+    };
+
+    // When a measurement is added, we don't need to add marker listeners
+    // because we only save when measurement-finished event is emitted
+    const handleMeasurementAddedWithMarkerListener = (event: any) => {
+      handleMeasurementAdded(event);
+      // No need to add marker listeners - we wait for event emitter
+    };
+    
+    // Listen to event emitter for measurement finished events (primary method)
+    if (window.eventBus) {
+      window.eventBus.on("measurement-finished", handleMeasurementFinished);
+    }
+    
+    window.viewer.scene.addEventListener("measurement_added", handleMeasurementAddedWithMarkerListener);
+    window.viewer.scene.addEventListener("measurement_removed", handleMeasurementRemoved);
+    
+    // No need to add marker listeners - we only save when measurement-finished event is emitted
+
+    return () => {
+      if (window.viewer && window.viewer.scene) {
+        window.viewer.scene.removeEventListener("measurement_added", handleMeasurementAddedWithMarkerListener);
+        window.viewer.scene.removeEventListener("measurement_removed", handleMeasurementRemoved);
+        
+        // Remove event emitter listener
+        if (window.eventBus) {
+          window.eventBus.off("measurement-finished", handleMeasurementFinished);
+        }
+        
+        // Clear all pending timeouts
+        pendingMeasurementsRef.current.forEach((timeout) => {
+          clearTimeout(timeout);
+        });
+        pendingMeasurementsRef.current.clear();
+      }
+    };
+  }, [window.viewer, isPotreeReady, project?.metadata?.pointCloud]);
 
   // Load point clouds from project metadata when store updates
   useEffect(() => {
@@ -504,6 +821,8 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         setTimeout(() => {
           console.log(`Focusing on point cloud: ${focusId}`);
           PotreeService.focusToPointCloud(focusId!);
+          // Track the focused point cloud as active (PotreeService also sets global variable)
+          activePointCloudIdRef.current = focusId;
         }, 500); // Wait 1.5 seconds for point cloud to load
       }
 
@@ -512,6 +831,148 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         isFirstLoadRef.current = false;
       }
       previousPointCloudCountRef.current = currentCount;
+
+      // Load measurement layers after point clouds are loaded
+      setTimeout(() => {
+        loadMeasurementLayers();
+      }, 1000); // Wait for point clouds to be fully loaded
+    };
+
+    // Load measurement layers from project metadata
+    const loadMeasurementLayers = () => {
+      if (!window.viewer || !window.viewer.scene) return;
+
+      // Set flag to prevent event listener from adding measurements during loading
+      isLoadingMeasurementsRef.current = true;
+
+      try {
+        const pointClouds = project?.metadata?.pointCloud || [];
+        
+        // Collect all measurements from all point clouds
+        const allMeasurements: any[] = [];
+        
+        for (const pc of pointClouds) {
+          if (!pc.layers || pc.layers.length === 0) continue;
+
+          // Get measurement layers for this point cloud
+          const measurementLayers = pc.layers.filter((layer) => layer.type === "measurement");
+          
+          for (const layer of measurementLayers) {
+            // Check if measurement already exists in viewer
+            const existingMeasurement = window.viewer.scene.measurements.find(
+              (m: any) => m.uuid === layer.id
+            );
+            
+            if (existingMeasurement) {
+              continue; // Skip if already loaded
+            }
+
+            // Create measurement data in the format expected by loadMeasurement
+            // Use saved points if available, otherwise use extent
+            const points = layer.points && layer.points.length > 0
+              ? layer.points
+              : [
+                  [layer.extent.min.x, layer.extent.min.y, layer.extent.min.z],
+                  [layer.extent.max.x, layer.extent.max.y, layer.extent.max.z],
+                ];
+
+            const measurementData = {
+              uuid: layer.id,
+              name: layer.name,
+              points: points,
+              visible: layer.visible !== false,
+              showDistances: layer.showDistances ?? (layer.measurementType === "line" || layer.measurementType === "polygon"),
+              showCoordinates: layer.showCoordinates ?? false,
+              showArea: layer.showArea ?? (layer.measurementType === "area" || layer.measurementType === "polygon"),
+              closed: layer.closed ?? (layer.measurementType === "polygon" || layer.measurementType === "area"),
+              showAngles: layer.showAngles ?? false,
+              showHeight: layer.showHeight ?? false,
+              showCircle: layer.showCircle ?? false,
+              showAzimuth: layer.showAzimuth ?? false,
+              showEdges: layer.showEdges ?? true,
+              color: layer.color ?? [1, 1, 0], // Use saved color or default yellow
+              icon: layer.icon, // Icon path if available
+            };
+
+            allMeasurements.push(measurementData);
+          }
+        }
+
+        // Load all measurements using loadMeasurement function (like the example code)
+        if (typeof (window as any).loadMeasurement === "function") {
+          for (const measure of allMeasurements) {
+            try {
+              (window as any).loadMeasurement(window.viewer, measure);
+              
+              // Set color if available (loadMeasurement doesn't set color)
+              const loadedMeasure = window.viewer.scene.measurements.find(
+                (m: any) => m.uuid === measure.uuid
+              );
+              if (loadedMeasure && measure.color && measure.color.length >= 3) {
+                loadedMeasure.color = new window.THREE.Color(
+                  measure.color[0],
+                  measure.color[1],
+                  measure.color[2]
+                );
+              }
+            } catch (error) {
+              console.error(`Error loading measurement ${measure.uuid}:`, error);
+            }
+          }
+        } else {
+          // Fallback: create measurements manually
+          const Measure = window.Potree.Measure;
+          const Vector3 = window.THREE.Vector3;
+          
+          for (const measurementData of allMeasurements) {
+            try {
+              // Check for duplicate
+              const duplicate = window.viewer.scene.measurements.find(
+                (m: any) => m.uuid === measurementData.uuid
+              );
+              if (duplicate) {
+                continue; // Skip if already exists
+              }
+              
+              const measure = new Measure();
+              measure.uuid = measurementData.uuid;
+              measure.name = measurementData.name;
+              measure.showDistances = measurementData.showDistances;
+              measure.showCoordinates = measurementData.showCoordinates;
+              measure.showArea = measurementData.showArea;
+              measure.closed = measurementData.closed;
+              measure.showAngles = measurementData.showAngles;
+              measure.showHeight = measurementData.showHeight;
+              measure.showCircle = measurementData.showCircle;
+              measure.showAzimuth = measurementData.showAzimuth;
+              measure.showEdges = measurementData.showEdges;
+              measure.visible = measurementData.visible;
+
+              // Add points
+              measurementData.points.forEach((point: number[]) => {
+                const pos = new Vector3(point[0], point[1], point[2]);
+                measure.addMarker(pos);
+              });
+              
+              // Set color if available
+              if (measurementData.color && measurementData.color.length >= 3) {
+                measure.color = new window.THREE.Color(
+                  measurementData.color[0],
+                  measurementData.color[1],
+                  measurementData.color[2]
+                );
+              }
+
+              window.viewer.scene.addMeasurement(measure);
+            } catch (error) {
+              console.error(`Error loading measurement ${measurementData.uuid}:`, error);
+            }
+          }
+        }
+      } finally {
+        // Reset flag after loading is complete
+        isLoadingMeasurementsRef.current = false;
+      }
     };
 
     loadPointClouds();

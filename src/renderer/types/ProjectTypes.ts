@@ -49,6 +49,28 @@ export interface DSM {
   res: number;
 }
 
+export interface MeasurementLayer {
+  id: string;
+  name: string;
+  type: "measurement";
+  visible: boolean;
+  extent: BBox;
+  measurementType?: string; // e.g., "point", "line", "polygon", "area", "volume"
+  pointCloudId: string; // Ait olduğu point cloud ID'si
+  points?: number[][]; // Measurement points as [x, y, z] arrays
+  showDistances?: boolean;
+  showArea?: boolean;
+  showCoordinates?: boolean;
+  closed?: boolean;
+  showAngles?: boolean;
+  showHeight?: boolean;
+  showCircle?: boolean;
+  showAzimuth?: boolean;
+  showEdges?: boolean;
+  color?: number[]; // [r, g, b] color array
+  icon?: string; // Icon path
+}
+
 export interface PointCloud {
   id: string;
   name: string;
@@ -65,6 +87,7 @@ export interface PointCloud {
   numberOfPoints: number;
   dsm: DSM;
   visible?: boolean; // Default: true if not specified
+  layers?: MeasurementLayer[]; // Measurement layers array
 }
 
 export interface Orthophoto {

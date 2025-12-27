@@ -4,6 +4,7 @@ import React, {
   forwardRef,
   useMemo,
   useEffect,
+  useRef,
 } from "react";
 import { useSelector } from "react-redux";
 import {
@@ -27,9 +28,19 @@ import {
   Info,
   Trash2,
   Scan,
+  Spline,
+  VectorSquare,
+  RulerDimensionLine,
+  Tangent,
+  Circle,
 } from "lucide-react";
 import { RootState } from "../../store/store";
-import { PointCloud, Mesh, Orthophoto } from "../../types/ProjectTypes";
+import {
+  PointCloud,
+  Mesh,
+  Orthophoto,
+  MeasurementLayer,
+} from "../../types/ProjectTypes";
 import PotreeService from "../../services/PotreeService";
 import ProjectActions from "../../store/actions/ProjectActions";
 import PointCloudService from "../../services/PointCloudService";
@@ -38,8 +49,8 @@ interface Layer {
   id: string;
   name: string;
   visible: boolean;
-  type: "point-cloud" | "mesh" | "orthophoto" | "dsm" | "dtm";
-  data?: PointCloud | Mesh | Orthophoto;
+  type: "point-cloud" | "mesh" | "orthophoto" | "dsm" | "dtm" | "measurement";
+  data?: PointCloud | Mesh | Orthophoto | MeasurementLayer;
   children?: Layer[];
 }
 
@@ -116,13 +127,28 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
       type: "point-cloud",
       children:
         validPointClouds && validPointClouds.length > 0
-          ? validPointClouds.map((pc) => ({
-              id: pc.id,
-              name: `${pc.name}${pc.extension}`,
-              visible: pc.visible !== false, // Use pointCloud.visible from Redux
-              type: "point-cloud",
-              data: pc,
-            }))
+          ? validPointClouds.map((pc) => {
+              // Get measurement layers for this point cloud
+              const measurementLayers: Layer[] = (pc.layers || [])
+                .filter((layer) => layer.type === "measurement")
+                .map((layer) => ({
+                  id: layer.id,
+                  name: layer.name,
+                  visible: layer.visible,
+                  type: "measurement" as const,
+                  data: layer,
+                }));
+
+              return {
+                id: pc.id,
+                name: `${pc.name}${pc.extension}`,
+                visible: pc.visible !== false, // Use pointCloud.visible from Redux
+                type: "point-cloud",
+                data: pc,
+                children:
+                  measurementLayers.length > 0 ? measurementLayers : undefined,
+              };
+            })
           : [],
     });
 
@@ -222,7 +248,31 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
     [layers]
   );
 
-  const toggleVisibility = (layerId: string, layerType: string) => {
+  // Auto-expand all layers when project is first loaded or point clouds are loaded
+  const hasExpandedOnceRef = useRef(false);
+  useEffect(() => {
+    if (
+      project &&
+      layers.length > 0 &&
+      validPointClouds.length > 0 &&
+      !hasExpandedOnceRef.current
+    ) {
+      const allIds = getAllLayerIdsWithChildren(layers);
+      setExpandedItems(allIds);
+      hasExpandedOnceRef.current = true;
+    }
+
+    // Reset when project changes
+    if (!project) {
+      hasExpandedOnceRef.current = false;
+    }
+  }, [project?.project?.id, layers, validPointClouds.length]);
+
+  const toggleVisibility = (
+    layerId: string,
+    layerType: string,
+    pointCloudId?: string
+  ) => {
     if (layerType === "point-cloud") {
       // Get current visibility from Redux
       const currentState = ProjectActions.getProjectState();
@@ -233,6 +283,33 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
 
       // Toggle visibility using PointCloudService
       PointCloudService.pointCloudVisibility(layerId, !currentVisible);
+    } else if (layerType === "measurement" && pointCloudId) {
+      // Toggle measurement layer visibility
+      const currentState = ProjectActions.getProjectState();
+      const pointCloud = currentState.project?.metadata.pointCloud?.find(
+        (pc) => pc.id === pointCloudId
+      );
+      const measurementLayer = pointCloud?.layers?.find(
+        (l) => l.id === layerId
+      );
+      if (measurementLayer) {
+        const currentVisible = measurementLayer.visible;
+        ProjectActions.updateMeasurementLayerVisibility(
+          pointCloudId,
+          layerId,
+          !currentVisible
+        );
+
+        // Also update visibility in Potree viewer
+        if (window.viewer && window.viewer.scene) {
+          const measurement = window.viewer.scene.measurements.find(
+            (m: any) => m.uuid === layerId
+          );
+          if (measurement) {
+            measurement.visible = !currentVisible;
+          }
+        }
+      }
     } else {
       // For other layer types, use local state (if needed in future)
       // For now, just log
@@ -252,71 +329,221 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
     });
   };
 
-  const renderLayer = (layer: Layer, level: number = 0): React.ReactNode => {
+  // Get icon for measurement layer based on icon type (using RibbonMenu icons)
+  const getMeasurementIcon = (iconType?: string) => {
+    switch (iconType) {
+      case "Spline": // Distance
+      case "distance":
+        return Spline;
+      case "VectorSquare": // Area
+      case "area":
+        return VectorSquare;
+      case "RulerDimensionLine": // Height
+      case "height":
+        return RulerDimensionLine;
+      case "Tangent": // Angle
+      case "angle":
+        return Tangent;
+      case "Circle": // Point
+      case "point":
+        return Circle;
+      default:
+        return LayersIcon;
+    }
+  };
+
+  const renderLayer = (
+    layer: Layer,
+    level: number = 0,
+    parentPointCloudId?: string
+  ): React.ReactNode => {
     const hasChildren = layer.children && layer.children.length > 0;
-    // For point clouds, get visibility from Redux; for others, default to true
+    // For point clouds, get visibility from Redux; for measurements, get from data; for others, default to true
     const isVisible =
       layer.type === "point-cloud" && layer.data
         ? (layer.data as PointCloud).visible !== false
+        : layer.type === "measurement" && layer.data
+        ? (layer.data as MeasurementLayer).visible
         : true;
+
+    // Get point cloud ID for measurement layers
+    const pointCloudId =
+      layer.type === "measurement" && layer.data
+        ? (layer.data as MeasurementLayer).pointCloudId
+        : layer.type === "point-cloud"
+        ? layer.id
+        : parentPointCloudId;
+
+    // Get icon for measurement layers
+    const MeasurementIcon =
+      layer.type === "measurement" && layer.data
+        ? getMeasurementIcon((layer.data as MeasurementLayer).icon)
+        : LayersIcon;
 
     if (hasChildren) {
       const isExpanded = expandedItems.includes(layer.id);
+      
+      const handleLayerClick = () => {
+        // If it's a point cloud, focus to it
+        if (layer.type === "point-cloud" && layer.data) {
+          PotreeService.focusToPointCloud(layer.id);
+        }
+      };
+
+      const handleShowProperties = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenuOpen(null);
+
+        if (layer.type === "point-cloud" && layer.data) {
+          const pc = layer.data as PointCloud;
+          setSelectedPointCloud(pc);
+
+          try {
+            const projectState = ProjectActions.getProjectState();
+            if (projectState.project?.project.path && pc.asset) {
+              const metadataPath = window.electronAPI.pathJoin(
+                projectState.project.project.path,
+                pc.path
+              );
+              const size = await window.electronAPI.getFileSize(metadataPath);
+              setFileSize(size);
+            }
+          } catch (error) {
+            console.error("Error getting file size:", error);
+            setFileSize(null);
+          }
+        }
+      };
+
+      const handleDelete = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenuOpen(null);
+
+        if (layer.type === "point-cloud" && layer.data) {
+          const pc = layer.data as PointCloud;
+          PotreeService.deletePointCloud(pc.id);
+          ProjectActions.deletePointCloud(pc.id);
+        }
+      };
+
       return (
-        <Accordion
+        <ContextMenu
           key={layer.id}
-          type="single"
-          collapsible
-          className="w-full"
-          value={isExpanded ? layer.id : ""}
-          onValueChange={(value) => {
-            handleAccordionChange(layer.id, value);
+          open={contextMenuOpen === layer.id}
+          onOpenChange={(open) => {
+            if (!open) {
+              setContextMenuOpen(null);
+            } else {
+              setContextMenuOpen(layer.id);
+            }
           }}
         >
-          <AccordionItem value={layer.id} className="border-none">
-            <AccordionTrigger className="py-1 px-2 hover:bg-accent rounded-sm text-xs">
-              <div className="flex items-center gap-2 flex-1 text-left">
-                <LayersIcon className="h-3 w-3 text-blue-400 flex-shrink-0" />
-                <span className="truncate flex-1">{layer.name}</span>
-                <div
-                  className="flex items-center gap-1"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {layer.id != "mesh-parent" &&
-                    layer.id != "point-cloud-parent" &&
-                    layer.id != "vector-parent" && (
-                      <div
-                        className="h-7 w-7 p-1.5 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          toggleVisibility(layer.id, layer.type);
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                      >
-                        {isVisible ? (
-                          <Eye className="h-3 w-3" />
-                        ) : (
-                          <EyeOff className="h-3 w-3 text-muted-foreground" />
+          <Accordion
+            key={layer.id}
+            type="single"
+            collapsible
+            className="w-full"
+            value={isExpanded ? layer.id : ""}
+            onValueChange={(value) => {
+              handleAccordionChange(layer.id, value);
+            }}
+          >
+            <AccordionItem value={layer.id} className="border-none">
+              <ContextMenuTrigger asChild>
+                <AccordionTrigger className="py-1 px-2 hover:bg-accent rounded-sm text-xs">
+                  <div className="flex items-center gap-2 flex-1 text-left min-w-0">
+                    <LayersIcon className="h-3 w-3 text-blue-400 flex-shrink-0" />
+                    <span
+                      className="truncate flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                      style={{ maxWidth: "126px" }}
+                    >
+                      {layer.name}
+                    </span>
+                    <div
+                      className={`flex items-center ${layer.type == "measurement" ? "gap-1" : ""}`}
+                      onClick={(e) => e.stopPropagation()}
+                      onContextMenu={(e) => e.stopPropagation()}
+                    >
+                      {layer.id != "mesh-parent" &&
+                        layer.id != "point-cloud-parent" &&
+                        layer.id != "vector-parent" && (
+                          <>
+                            <div
+                              className="h-7 w-7 p-1.5 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                toggleVisibility(layer.id, layer.type, pointCloudId);
+                              }}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onContextMenu={(e) => e.stopPropagation()}
+                            >
+                              {isVisible ? (
+                                <Eye className="h-3 w-3" />
+                              ) : (
+                                <EyeOff className="h-3 w-3 text-muted-foreground" />
+                              )}
+                            </div>
+                            {/* Show focus button for point clouds even if they have children */}
+                            {layer.type === "point-cloud" && (
+                              <div
+                                className="h-7 w-7 p-1.5 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  handleLayerClick();
+                                }}
+                                onContextMenu={(e) => e.stopPropagation()}
+                              >
+                                <Scan className="h-3 w-3" />
+                              </div>
+                            )}
+                          </>
                         )}
-                      </div>
-                    )}
+                    </div>
+                  </div>
+                </AccordionTrigger>
+              </ContextMenuTrigger>
+              {(layer.type === "point-cloud") && (
+                <ContextMenuContent>
+                  <ContextMenuItem
+                    onClick={handleShowProperties}
+                    className="text-xs"
+                  >
+                    <Info className="mr-2 h-3 w-3" />
+                    Properties
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={handleDelete}
+                    className="text-xs text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-3 w-3" />
+                    Delete
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              )}
+              <AccordionContent className="pb-0 pt-0">
+                <div className="pl-4">
+                  {layer.children!.map((child) =>
+                    renderLayer(child, level + 1, pointCloudId)
+                  )}
                 </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-0 pt-0">
-              <div className="pl-4">
-                {layer.children!.map((child) => renderLayer(child, level + 1))}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </ContextMenu>
       );
     } else {
       const handleLayerClick = () => {
         // If it's a point cloud, focus to it
         if (layer.type === "point-cloud" && layer.data) {
           PotreeService.focusToPointCloud(layer.id);
+        } else if (layer.type === "measurement" && layer.data) {
+          // Focus to measurement extent
+          const measurementLayer = layer.data as MeasurementLayer;
+          PotreeService.focusToMeasure(measurementLayer.extent);
         }
       };
 
@@ -364,6 +591,24 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
 
           // Remove from Redux store
           ProjectActions.deletePointCloud(pc.id);
+        } else if (layer.type === "measurement" && layer.data && pointCloudId) {
+          const measurementLayer = layer.data as MeasurementLayer;
+
+          // Remove from Potree viewer
+          if (window.viewer && window.viewer.scene) {
+            const measurement = window.viewer.scene.measurements.find(
+              (m: any) => m.uuid === measurementLayer.id
+            );
+            if (measurement) {
+              window.viewer.scene.removeMeasurement(measurement);
+            }
+          }
+
+          // Remove from Redux store
+          ProjectActions.removeMeasurementLayer(
+            pointCloudId,
+            measurementLayer.id
+          );
         }
       };
 
@@ -380,9 +625,43 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
           }}
         >
           <ContextMenuTrigger asChild>
-            <div className="flex items-center gap-2 py-1 px-2 hover:bg-accent rounded-sm text-xs cursor-pointer">
-              <LayersIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-              <span className="truncate flex-1">{layer.name}</span>
+            <div
+              className={`flex items-center gap-1 hover:bg-accent rounded-sm cursor-pointer min-w-0 ${
+                layer.type === "measurement"
+                  ? "py-0.5 px-1.5 text-[10px]"
+                  : "py-1 px-2 text-xs"
+              }`}
+              style={{ justifyContent: "space-between" }}
+            >
+              <div
+                className="gap-1"
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                 {layer.type === "measurement" ? (
+                   <MeasurementIcon 
+                     className="h-2.5 w-2.5 text-yellow-400 flex-shrink-0" 
+                     style={
+                       layer.data && (layer.data as MeasurementLayer).icon === "RulerDimensionLine"
+                         ? { transform: "rotate(90deg)" }
+                         : undefined
+                     }
+                   />
+                 ) : (
+                   <LayersIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                 )}
+                <span
+                  className="truncate flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                  style={{
+                    maxWidth: layer.type === "measurement" ? "120px" : "126px",
+                  }}
+                >
+                  {layer.name}
+                </span>
+              </div>
 
               {layer.id != "mesh-parent" &&
                 layer.id != "point-cloud-parent" &&
@@ -390,45 +669,80 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                   <div
                     className="flex items-center"
                     onClick={(e) => e.stopPropagation()}
+                    onContextMenu={(e) => e.stopPropagation()}
                   >
                     <div
-                      className="h-7 w-7 p-1.5 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer"
+                      className={`flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer ${
+                        layer.type === "measurement"
+                          ? "h-5 w-5 p-0.5"
+                          : "h-7 w-7 p-1.5"
+                      }`}
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
-                        toggleVisibility(layer.id, layer.type);
+                        toggleVisibility(layer.id, layer.type, pointCloudId);
                       }}
                       onMouseDown={(e) => e.stopPropagation()}
+                      onContextMenu={(e) => e.stopPropagation()}
                     >
                       {isVisible ? (
-                        <Eye className="h-3 w-3" />
+                        <Eye
+                          className={
+                            layer.type === "measurement"
+                              ? "h-2.5 w-2.5"
+                              : "h-3 w-3"
+                          }
+                        />
                       ) : (
-                        <EyeOff className="h-3 w-3 text-muted-foreground" />
+                        <EyeOff
+                          className={`text-muted-foreground ${
+                            layer.type === "measurement"
+                              ? "h-2.5 w-2.5"
+                              : "h-3 w-3"
+                          }`}
+                        />
                       )}
                     </div>
-                    <div
-                      className="h-7 w-7 p-1.5 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        handleLayerClick();
-                      }}
-                    >
-                      <Scan className="h-3 w-3" />
-                    </div>
+                    {/* Show focus button for point clouds even if they have children */}
+                    {(layer.type === "point-cloud" ||
+                      layer.type === "measurement") && (
+                      <div
+                        className={`flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer ${
+                          layer.type === "measurement"
+                            ? "h-5 w-5 p-0.5"
+                            : "h-7 w-7 p-1.5"
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          handleLayerClick();
+                        }}
+                        onContextMenu={(e) => e.stopPropagation()}
+                      >
+                        <Scan
+                          className={
+                            layer.type === "measurement"
+                              ? "h-2.5 w-2.5"
+                              : "h-3 w-3"
+                          }
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
             </div>
           </ContextMenuTrigger>
-          {layer.type === "point-cloud" && (
+          {(layer.type === "point-cloud" || layer.type === "measurement") && (
             <ContextMenuContent>
-              <ContextMenuItem
-                onClick={handleShowProperties}
-                className="text-xs"
-              >
-                <Info className="mr-2 h-3 w-3" />
-                Properties
-              </ContextMenuItem>
+              {layer.type === "point-cloud" && (
+                <ContextMenuItem
+                  onClick={handleShowProperties}
+                  className="text-xs"
+                >
+                  <Info className="mr-2 h-3 w-3" />
+                  Properties
+                </ContextMenuItem>
+              )}
               <ContextMenuItem
                 onClick={handleDelete}
                 className="text-xs text-destructive focus:text-destructive"

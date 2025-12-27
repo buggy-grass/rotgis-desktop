@@ -3,6 +3,7 @@ import {
   Project,
   Metadata,
   OutCoordSys,
+  MeasurementLayer,
 } from "../types/ProjectTypes";
 
 /**
@@ -272,6 +273,7 @@ function parsePointCloud(element: Element) {
       res: getNumberContent(element.querySelector("dsm > res")),
     },
     visible: getBooleanContent(element.querySelector("visible"), true), // Default to true
+    layers: parseMeasurementLayers(element.querySelector("layers")),
   };
 }
 
@@ -345,6 +347,59 @@ function parseOutCoordSys(element: Element | null): OutCoordSys {
   };
 }
 
+function parseMeasurementLayers(element: Element | null): MeasurementLayer[] {
+  if (!element) {
+    return [];
+  }
+  const layerElements = element.querySelectorAll("layer");
+  return Array.from(layerElements).map((layerEl) => parseMeasurementLayer(layerEl));
+}
+
+function parseMeasurementLayer(element: Element): MeasurementLayer {
+  // Parse points array
+  const pointsElements = element.querySelectorAll("points > point");
+  const points: number[][] = [];
+  pointsElements.forEach((pointEl) => {
+    const x = getNumberContent(pointEl.querySelector("x"));
+    const y = getNumberContent(pointEl.querySelector("y"));
+    const z = getNumberContent(pointEl.querySelector("z"));
+    points.push([x, y, z]);
+  });
+
+  // Parse color array
+  const colorElements = element.querySelectorAll("color > value");
+  let color: number[] | undefined;
+  if (colorElements.length >= 3) {
+    color = [
+      getNumberContent(colorElements[0]),
+      getNumberContent(colorElements[1]),
+      getNumberContent(colorElements[2]),
+    ];
+  }
+
+  return {
+    id: getTextContent(element.querySelector("id")),
+    name: getTextContent(element.querySelector("name")),
+    type: "measurement" as const,
+    visible: getBooleanContent(element.querySelector("visible"), true),
+    extent: parseBBox(element.querySelector("extent")),
+    measurementType: getTextContent(element.querySelector("measurementType")) || undefined,
+    pointCloudId: getTextContent(element.querySelector("pointCloudId")),
+    points: points.length > 0 ? points : undefined,
+    showDistances: getBooleanContent(element.querySelector("showDistances"), undefined),
+    showArea: getBooleanContent(element.querySelector("showArea"), undefined),
+    showCoordinates: getBooleanContent(element.querySelector("showCoordinates"), undefined),
+    closed: getBooleanContent(element.querySelector("closed"), undefined),
+    showAngles: getBooleanContent(element.querySelector("showAngles"), undefined),
+    showHeight: getBooleanContent(element.querySelector("showHeight"), undefined),
+    showCircle: getBooleanContent(element.querySelector("showCircle"), undefined),
+    showAzimuth: getBooleanContent(element.querySelector("showAzimuth"), undefined),
+    showEdges: getBooleanContent(element.querySelector("showEdges"), undefined),
+    color: color,
+    icon: getTextContent(element.querySelector("icon")) || undefined,
+  };
+}
+
 // Serializer functions
 
 function serializeMesh(mesh: any, indent: string): string {
@@ -392,6 +447,14 @@ function serializePointCloud(pc: any, indent: string): string {
   parts.push(`${indent}        <file>${escapeXML(pc.dsm.file)}</file>`);
   parts.push(`${indent}        <res>${pc.dsm.res}</res>`);
   parts.push(`${indent}    </dsm>`);
+  // Serialize measurement layers
+  if (pc.layers && pc.layers.length > 0) {
+    parts.push(`${indent}    <layers>`);
+    pc.layers.forEach((layer: any) => {
+      parts.push(serializeMeasurementLayer(layer, `${indent}        `));
+    });
+    parts.push(`${indent}    </layers>`);
+  }
   parts.push(`${indent}</pointCloud>`);
   return parts.join("\n");
 }
@@ -443,5 +506,80 @@ function serializeCenter(center: any, indent: string): string {
   const parts: string[] = [];
   parts.push(`${indent}<center>${center.x}</center>`);
   parts.push(`${indent}<center>${center.y}</center>`);
+  return parts.join("\n");
+}
+
+function serializeMeasurementLayer(layer: MeasurementLayer, indent: string): string {
+  const parts: string[] = [];
+  parts.push(`${indent}<layer>`);
+  parts.push(`${indent}    <id>${escapeXML(layer.id)}</id>`);
+  parts.push(`${indent}    <name>${escapeXML(layer.name)}</name>`);
+  parts.push(`${indent}    <type>${layer.type}</type>`);
+  parts.push(`${indent}    <visible>${layer.visible}</visible>`);
+  parts.push(`${indent}    <extent>`);
+  parts.push(serializeBBox(layer.extent, `${indent}        `));
+  parts.push(`${indent}    </extent>`);
+  if (layer.measurementType) {
+    parts.push(`${indent}    <measurementType>${escapeXML(layer.measurementType)}</measurementType>`);
+  }
+  parts.push(`${indent}    <pointCloudId>${escapeXML(layer.pointCloudId)}</pointCloudId>`);
+  
+  // Serialize points if available
+  if (layer.points && layer.points.length > 0) {
+    parts.push(`${indent}    <points>`);
+    layer.points.forEach((point) => {
+      parts.push(`${indent}        <point>`);
+      parts.push(`${indent}            <x>${point[0]}</x>`);
+      parts.push(`${indent}            <y>${point[1]}</y>`);
+      parts.push(`${indent}            <z>${point[2]}</z>`);
+      parts.push(`${indent}        </point>`);
+    });
+    parts.push(`${indent}    </points>`);
+  }
+  
+  // Serialize measurement properties
+  if (layer.showDistances !== undefined) {
+    parts.push(`${indent}    <showDistances>${layer.showDistances}</showDistances>`);
+  }
+  if (layer.showArea !== undefined) {
+    parts.push(`${indent}    <showArea>${layer.showArea}</showArea>`);
+  }
+  if (layer.showCoordinates !== undefined) {
+    parts.push(`${indent}    <showCoordinates>${layer.showCoordinates}</showCoordinates>`);
+  }
+  if (layer.closed !== undefined) {
+    parts.push(`${indent}    <closed>${layer.closed}</closed>`);
+  }
+  if (layer.showAngles !== undefined) {
+    parts.push(`${indent}    <showAngles>${layer.showAngles}</showAngles>`);
+  }
+  if (layer.showHeight !== undefined) {
+    parts.push(`${indent}    <showHeight>${layer.showHeight}</showHeight>`);
+  }
+  if (layer.showCircle !== undefined) {
+    parts.push(`${indent}    <showCircle>${layer.showCircle}</showCircle>`);
+  }
+  if (layer.showAzimuth !== undefined) {
+    parts.push(`${indent}    <showAzimuth>${layer.showAzimuth}</showAzimuth>`);
+  }
+  if (layer.showEdges !== undefined) {
+    parts.push(`${indent}    <showEdges>${layer.showEdges}</showEdges>`);
+  }
+  
+  // Serialize color if available
+  if (layer.color && layer.color.length >= 3) {
+    parts.push(`${indent}    <color>`);
+    parts.push(`${indent}        <value>${layer.color[0]}</value>`);
+    parts.push(`${indent}        <value>${layer.color[1]}</value>`);
+    parts.push(`${indent}        <value>${layer.color[2]}</value>`);
+    parts.push(`${indent}    </color>`);
+  }
+  
+  // Serialize icon if available
+  if (layer.icon) {
+    parts.push(`${indent}    <icon>${escapeXML(layer.icon)}</icon>`);
+  }
+  
+  parts.push(`${indent}</layer>`);
   return parts.join("\n");
 }
