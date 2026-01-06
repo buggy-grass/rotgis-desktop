@@ -28,6 +28,26 @@ app.commandLine.appendSwitch("enable-gpu-memory-buffer-video-frames");
 
 // Windows'ta NVIDIA GPU'yu zorla - DirectX 11 kullan (NVIDIA için optimize)
 if (process.platform === "win32") {
+  // DXC (DirectX Shader Compiler) yolunu ayarla - Dawn WebGPU için gerekli
+  // Development ve production için farklı yollar
+  const dxcPath = app.isPackaged
+    ? path.join(app.getAppPath().replace(/[\\/]app\.asar$/, ""), "libs", "dxc")
+    : path.join(process.cwd(), "libs", "dxc");
+  
+  // DXC klasörünün varlığını kontrol et
+  if (fs.existsSync(dxcPath)) {
+    // PATH'e DXC klasörünü ekle (DLL'lerin yüklenebilmesi için)
+    const currentPath = process.env.PATH || "";
+    process.env.PATH = `${dxcPath}${path.delimiter}${currentPath}`;
+    
+    // Dawn'ın DXC'yi bulabilmesi için environment variable ayarla
+    process.env.DXC_PATH = dxcPath;
+    
+    console.log(`DXC path configured: ${dxcPath}`);
+  } else {
+    console.warn(`DXC path not found: ${dxcPath}`);
+  }
+
   // Environment variables - app başlamadan ÖNCE set et (çok önemli!)
   // NVIDIA Optimus için (laptop'larda hem Intel hem NVIDIA varsa)
   process.env.__GL_SYNC_TO_VBLANK = "0";

@@ -218,7 +218,7 @@ class PointCloudService {
             ),
             bbox: bbox,
             center: center,
-            epsg: metadata.projection || "4326",
+            epsg: metadata.epsg || "4326",
             epsgText: metadata.projection || "WGS 84",
             proj4: metadata.projection || "+proj=longlat +datum=WGS84 +no_defs",
             path: window.electronAPI.pathJoin(
