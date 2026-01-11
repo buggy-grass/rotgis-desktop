@@ -2,11 +2,10 @@ import React, { useState, useRef, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import SettingsActions from "../../store/actions/SettingsActions";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { Mouse, ChevronDown, Zap } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import MouseIcon from '../../assets/app/settings/mouse.png';
+import { makeUseStyles } from "../../styles/makeUseStyles";
 
 interface MouseButton {
   id: string;
@@ -56,91 +55,132 @@ const AVAILABLE_ACTIONS = [
   "Measure",
   "Custom",
   "None",
+  "Yaw/Pitch/Roll",
+  "Mouse Doll",
+];
+
+interface MouseButtonConfig {
+  id: string;
+  name: string;
+  mouseTargetPosition: { x: number; y: number }; // Mouse görseli üzerindeki hedef pozisyon (%)
+}
+
+const MOUSE_BUTTONS: MouseButtonConfig[] = [
+  {
+    id: "left",
+    name: "Button Left",
+    mouseTargetPosition: { x: 30, y: 50 }, // Sol tuş pozisyonu
+  },
+  {
+    id: "right",
+    name: "Button Right",
+    mouseTargetPosition: { x: 70, y: 50 }, // Sağ tuş pozisyonu
+  },
+  {
+    id: "wheel",
+    name: "MOUSE_WHEEL",
+    mouseTargetPosition: { x: 50, y: 35 }, // Scroll wheel pozisyonu
+  },
+  {
+    id: "button4",
+    name: "BUTTON 4",
+    mouseTargetPosition: { x: 15, y: 55 }, // Sol yan buton pozisyonu
+  },
+  {
+    id: "button5",
+    name: "BUTTON 5",
+    mouseTargetPosition: { x: 15, y: 65 }, // Sol yan buton 2 pozisyonu
+  },
 ];
 
 export default function MouseSettings() {
   const settings = useSelector((state: RootState) => state.settingsReducer);
-  const [hoveredButton, setHoveredButton] = useState<string | null>(null);
-  const [selectedButton, setSelectedButton] = useState<string | null>(null);
-  const [showKeyDropdown, setShowKeyDropdown] = useState<string | null>(null);
-  const [showActionDropdown, setShowActionDropdown] = useState<string | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
-  const keyDropdownRef = useRef<HTMLDivElement>(null);
-  const actionDropdownRef = useRef<HTMLDivElement>(null);
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
+  const mouseImageRef = useRef<HTMLDivElement>(null);
+  const dropdownRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const buttonRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [selectedButton, setSelectedButton] = useState<string>("");
 
-  const mouseButtons: MouseButton[] = [
-    {
-      id: "left",
-      name: "Left Click",
-      position: { x: 85, y: 185, width: 55, height: 90 },
-      shape: "rect",
-      color: "#ffffff",
-    },
-    {
-      id: "right",
-      name: "Right Click",
-      position: { x: 140, y: 185, width: 55, height: 90 },
-      shape: "rect",
-      color: "#ffffff",
-    },
-    {
-      id: "middle",
-      name: "Middle Click",
-      position: { x: 100, y: 150, width: 80, height: 28 },
-      shape: "rect",
-      color: "#1a1a1a",
-    },
-    {
-      id: "side1",
-      name: "Side Button 1",
-      position: { x: 25, y: 205, width: 32, height: 28 },
-      shape: "ellipse",
-      color: "#00d4ff",
-    },
-    {
-      id: "side2",
-      name: "Side Button 2",
-      position: { x: 25, y: 240, width: 32, height: 28 },
-      shape: "ellipse",
-      color: "#00d4ff",
-    },
-    {
-      id: "dpi",
-      name: "DPI Button",
-      position: { x: 120, y: 300, width: 42, height: 22 },
-      shape: "rect",
-      color: "#00d4ff",
-    },
-    {
-      id: "wheel-up",
-      name: "Wheel Up",
-      position: { x: 105, y: 135, width: 70, height: 12 },
-      shape: "rect",
-      color: "#ffffff",
-    },
-    {
-      id: "wheel-down",
-      name: "Wheel Down",
-      position: { x: 105, y: 188, width: 70, height: 12 },
-      shape: "rect",
-      color: "#ffffff",
-    },
-  ];
+  const dropdownOptions = ["Yaw/Pitch/Roll", "Mouse Doll", "Rotate"];
+
+  // Initialize button values from store
+  const getButtonValue = (buttonId: string): string => {
+    const mapping: Record<string, string> = {
+      left: "left",
+      right: "right",
+      wheel: "middle",
+      button4: "side1",
+      button5: "side2",
+    };
+    const storeId = mapping[buttonId];
+    const binding = settings.mouseSettings.buttonBindings.find((b) => b.buttonId === storeId);
+    // Map store actions to dropdown options
+    if (binding?.action === "Yaw/Pitch/Roll" || binding?.action === "Mouse Doll" || binding?.action === "Rotate") {
+      return binding.action;
+    }
+    // Default values
+    const defaults: Record<string, string> = {
+      left: "Yaw/Pitch/Roll",
+      right: "Rotate",
+      wheel: "Mouse Doll",
+      button4: "Rotate",
+      button5: "Yaw/Pitch/Roll",
+    };
+    return defaults[buttonId] || "Yaw/Pitch/Roll";
+  };
+
+  const handleDropdownChange = (buttonId: string, value: string) => {
+    setOpenDropdowns((prev) => ({ ...prev, [buttonId]: false }));
+    setSelectedButton("");
+    // Store'a kaydet
+    const mapping: Record<string, string> = {
+      left: "left",
+      right: "right",
+      wheel: "middle",
+      button4: "side1",
+      button5: "side2",
+    };
+    const storeId = mapping[buttonId];
+    const binding = settings.mouseSettings.buttonBindings.find((b) => b.buttonId === storeId);
+    if (binding) {
+      SettingsActions.setMouseButtonBinding(storeId, binding.keyBinding, value);
+    }
+  };
+
+  const toggleDropdown = (buttonId: string) => {
+    setOpenDropdowns((prev) => {
+      const isCurrentlyOpen = prev[buttonId];
+      // Eğer bu dropdown zaten açıksa kapat, değilse tümünü kapat ve sadece bunu aç
+      if (isCurrentlyOpen) {
+        setSelectedButton("");
+        return { ...prev, [buttonId]: false };
+      } else {
+        setSelectedButton(buttonId);
+        return { [buttonId]: true };
+      }
+    });
+  };
+
+  useEffect(()=>{
+    if(selectedButton){
+      toggleDropdown(selectedButton);
+    }
+  },[selectedButton])
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        keyDropdownRef.current &&
-        !keyDropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowKeyDropdown(null);
-      }
-      if (
-        actionDropdownRef.current &&
-        !actionDropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowActionDropdown(null);
+      const target = event.target as Node;
+      const clickedOutside = Object.values(dropdownRefs.current).every(
+        (ref) => ref && !ref.contains(target)
+      );
+      const clickedButton = Object.values(buttonRefs.current).some(
+        (ref) => ref && ref.contains(target)
+      );
+
+      if (clickedOutside && !clickedButton) {
+        setOpenDropdowns({});
+        setSelectedButton("");
       }
     };
 
@@ -150,312 +190,149 @@ export default function MouseSettings() {
     };
   }, []);
 
-  const getButtonBinding = (buttonId: string) => {
-    if (!settings.mouseSettings.buttonBindings) {
-      return null;
-    }
-    return settings.mouseSettings.buttonBindings.find(
-      (b) => b.buttonId === buttonId
-    ) || null;
-  };
-
-  const handleKeyChange = (buttonId: string, keyBinding: string) => {
-    const binding = getButtonBinding(buttonId);
-    const button = mouseButtons.find((b) => b.id === buttonId);
-    SettingsActions.setMouseButtonBinding(
-      buttonId,
-      keyBinding,
-      binding?.action || (button ? button.name : "None")
-    );
-    setShowKeyDropdown(null);
-  };
-
-  const handleActionChange = (buttonId: string, action: string) => {
-    const binding = getButtonBinding(buttonId);
-    SettingsActions.setMouseButtonBinding(
-      buttonId,
-      binding?.keyBinding || "None",
-      action
-    );
-    setShowActionDropdown(null);
-  };
-
-  const renderMouseButton = (button: MouseButton) => {
-    const binding = getButtonBinding(button.id);
-    const isHovered = hoveredButton === button.id;
-    const isSelected = selectedButton === button.id;
-
-    let element;
-    if (button.shape === "circle") {
-      element = (
-        <circle
-          cx={button.position.x + button.position.width / 2}
-          cy={button.position.y + button.position.height / 2}
-          r={button.position.width / 2}
-          fill={isHovered || isSelected ? button.color || "#00d4ff" : "#374151"}
-          stroke={isSelected ? "#00d4ff" : isHovered ? "#00d4ff" : "#4b5563"}
-          strokeWidth={isSelected ? 3 : isHovered ? 2 : 1}
-          opacity={isHovered || isSelected ? 1 : 0.8}
-          className="cursor-pointer transition-all duration-200"
-          onMouseEnter={() => setHoveredButton(button.id)}
-          onMouseLeave={() => setHoveredButton(null)}
-          onClick={() => setSelectedButton(selectedButton === button.id ? null : button.id)}
-          filter={isHovered || isSelected ? "url(#glow)" : undefined}
-        />
-      );
-    } else if (button.shape === "ellipse") {
-      element = (
-        <ellipse
-          cx={button.position.x + button.position.width / 2}
-          cy={button.position.y + button.position.height / 2}
-          rx={button.position.width / 2}
-          ry={button.position.height / 2}
-          fill={isHovered || isSelected ? button.color || "#00d4ff" : "#374151"}
-          stroke={isSelected ? "#00d4ff" : isHovered ? "#00d4ff" : "#4b5563"}
-          strokeWidth={isSelected ? 3 : isHovered ? 2 : 1}
-          opacity={isHovered || isSelected ? 1 : 0.8}
-          className="cursor-pointer transition-all duration-200"
-          onMouseEnter={() => setHoveredButton(button.id)}
-          onMouseLeave={() => setHoveredButton(null)}
-          onClick={() => setSelectedButton(selectedButton === button.id ? null : button.id)}
-          filter={isHovered || isSelected ? "url(#glow)" : undefined}
-        />
-      );
-    } else {
-      element = (
-        <rect
-          x={button.position.x}
-          y={button.position.y}
-          width={button.position.width}
-          height={button.position.height}
-          rx={button.id === "middle" ? 2 : 4}
-          fill={isHovered || isSelected ? button.color || "#ffffff" : (button.color || "#374151")}
-          stroke={isSelected ? "#00d4ff" : isHovered ? "#00d4ff" : "#4b5563"}
-          strokeWidth={isSelected ? 3 : isHovered ? 2 : 1}
-          opacity={isHovered || isSelected ? 1 : (button.id === "left" || button.id === "right" || button.id === "wheel-up" || button.id === "wheel-down" ? 1 : 0.8)}
-          className="cursor-pointer transition-all duration-200"
-          onMouseEnter={() => setHoveredButton(button.id)}
-          onMouseLeave={() => setHoveredButton(null)}
-          onClick={() => setSelectedButton(selectedButton === button.id ? null : button.id)}
-          filter={isHovered || isSelected ? "url(#glow)" : undefined}
-        />
-      );
-    }
-
-    return (
-      <g key={button.id}>
-        {element}
-        {(isHovered || isSelected) && button.id !== "left" && button.id !== "right" && (
-          <text
-            x={button.position.x + button.position.width / 2}
-            y={button.position.y + button.position.height / 2}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            className="pointer-events-none text-xs font-semibold fill-current"
-            fontSize="9"
-            fontWeight="bold"
-            fill="#00d4ff"
-          >
-            {button.name}
-          </text>
-        )}
-      </g>
-    );
-  };
-
   return (
     <div className="space-y-6">
       {/* Futuristic 3D Mouse Visualization */}
-      <div className="bg-gradient-to-br from-card via-card to-muted/20 border border-border rounded-xl p-8 shadow-2xl">
+      <div className="bg-gradient-to-br from-card via-card to-muted/20 border border-border rounded-xl p-8 shadow-2xl" style={{ position: "relative", minHeight: "600px" }}>
 
-        <div className="flex gap-8">
-          {/* Mouse Image - Futuristic 3D Design */}
-          <div className="flex-1 bg-gradient-to-br from-muted/50 via-background to-muted/30 rounded-lg p-8 border border-border/50 relative overflow-hidden flex items-center justify-center">
-            {/* Background Glow Effect */}
-            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/5 pointer-events-none" />
-            
-            {/* Mouse Image */}
-            <img
-              src={MouseIcon}
-              alt="Gaming Mouse"
-              className="w-full h-auto max-w-md mx-auto relative z-10 object-contain"
-              style={{ maxHeight: "700px", userSelect: "none" }}
-            />
+        <div className="flex gap-8 relative">
+          {/* Butonlar ve Dropdown'lar - Sol Taraf */}
+          <div className="flex flex-col gap-4 min-w-[280px]">
+            {MOUSE_BUTTONS.map((button) => (
+              <div key={button.id} className="flex items-center gap-3">
+                {/* Button Label */}
+                <div
+                  ref={(el) => (buttonRefs.current[button.id] = el)}
+                  className={`border px-3 py-2 rounded text-sm font-medium whitespace-nowrap transition-colors w-32 text-center ${openDropdowns[button.id]
+                    ? "bg-red-500/20 border-red-500/50 text-red-500"
+                    : "bg-card border-border"
+                    }`}
+                >
+                  {button.name}
+                </div>
 
-            {/* Hover hint */}
-            {hoveredButton && (
-              <div className="mt-4 p-3 bg-primary/10 border border-primary/30 rounded-lg text-center animate-pulse">
-                <p className="text-sm font-medium text-primary">
-                  Click to configure {hoveredButton}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Configuration Panel */}
-          {selectedButton && (
-            <div className="w-80 space-y-4 transition-all duration-300">
-              <div className="bg-card border border-border rounded-lg p-6 shadow-lg">
-                <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-primary" />
-                  {mouseButtons.find((b) => b.id === selectedButton)?.name}
-                </h4>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Key Binding</Label>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowKeyDropdown(
-                            showKeyDropdown === selectedButton ? null : selectedButton
-                          )
-                        }
-                        className="w-full flex items-center justify-between px-3 py-2 bg-background border border-input rounded-md text-sm hover:bg-accent transition-colors"
-                      >
-                        <span>{getButtonBinding(selectedButton)?.keyBinding || "None"}</span>
-                        <ChevronDown
-                          className={`h-4 w-4 transition-transform ${showKeyDropdown === selectedButton ? "rotate-180" : ""
-                            }`}
-                        />
-                      </button>
-                      {showKeyDropdown === selectedButton && (
-                        <div
-                          ref={keyDropdownRef}
-                          className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto"
-                        >
-                          {AVAILABLE_KEYS.map((key) => (
-                            <button
-                              key={key}
-                              type="button"
-                              onClick={() => handleKeyChange(selectedButton, key)}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors first:rounded-t-md last:rounded-b-md"
-                            >
-                              {key}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Action</Label>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowActionDropdown(
-                            showActionDropdown === selectedButton ? null : selectedButton
-                          )
-                        }
-                        className="w-full flex items-center justify-between px-3 py-2 bg-background border border-input rounded-md text-sm hover:bg-accent transition-colors"
-                      >
-                        <span>{getButtonBinding(selectedButton)?.action || "None"}</span>
-                        <ChevronDown
-                          className={`h-4 w-4 transition-transform ${showActionDropdown === selectedButton ? "rotate-180" : ""
-                            }`}
-                        />
-                      </button>
-                      {showActionDropdown === selectedButton && (
-                        <div
-                          ref={actionDropdownRef}
-                          className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto"
-                        >
-                          {AVAILABLE_ACTIONS.map((action) => (
-                            <button
-                              key={action}
-                              type="button"
-                              onClick={() => handleActionChange(selectedButton, action)}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors first:rounded-t-md last:rounded-b-md"
-                            >
-                              {action}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => setSelectedButton(null)}
+                {/* Dropdown */}
+                <div
+                  ref={(el) => (dropdownRefs.current[button.id] = el)}
+                  className="relative flex-1"
+                >
+                  <button
+                    onClick={() => toggleDropdown(button.id)}
+                    className="w-full flex items-center justify-between px-4 py-2 bg-card border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium"
                   >
-                    Close
-                  </Button>
+                    <span>{getButtonValue(button.id)}</span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${openDropdowns[button.id] ? "rotate-180" : ""}`}
+                    />
+                  </button>
+
+                  {openDropdowns[button.id] && (
+                    <div className="absolute top-0 left-full ml-2 w-48 bg-card border border-border rounded-lg shadow-lg z-40 overflow-hidden">
+                      {dropdownOptions.map((option) => (
+                        <button
+                          key={option}
+                          onClick={() => handleDropdownChange(button.id, option)}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-accent transition-colors ${getButtonValue(button.id) === option ? "bg-accent font-medium" : ""
+                            }`}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* DPI and Polling Rate Settings */}
-      <div className="grid grid-cols-2 gap-6">
-        <div className="bg-card border border-border rounded-lg p-6">
-          <Label htmlFor="dpi" className="text-sm font-medium mb-2 block">
-            DPI (Dots Per Inch)
-          </Label>
-          <div className="space-y-3">
-            <Input
-              id="dpi"
-              type="number"
-              min="100"
-              max="32000"
-              step="100"
-              value={settings.mouseSettings.dpi}
-              onChange={(e) =>
-                SettingsActions.setMouseDpi(parseInt(e.target.value) || 1600)
-              }
-              className="text-lg font-semibold"
-            />
-            <div className="flex gap-2">
-              {[800, 1600, 3200, 6400].map((dpi) => (
-                <Button
-                  key={dpi}
-                  variant={settings.mouseSettings.dpi === dpi ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => SettingsActions.setMouseDpi(dpi)}
-                >
-                  {dpi}
-                </Button>
-              ))}
-            </div>
+            ))}
           </div>
-        </div>
 
-        <div className="bg-card border border-border rounded-lg p-6">
-          <Label htmlFor="pollingRate" className="text-sm font-medium mb-2 block">
-            Polling Rate (Hz)
-          </Label>
-          <div className="space-y-3">
-            <Input
-              id="pollingRate"
-              type="number"
-              min="125"
-              max="8000"
-              step="125"
-              value={settings.mouseSettings.pollingRate}
-              onChange={(e) =>
-                SettingsActions.setMousePollingRate(parseInt(e.target.value) || 1000)
-              }
-              className="text-lg font-semibold"
-            />
-            <div className="flex gap-2 flex-wrap">
-              {[125, 250, 500, 1000, 2000, 4000, 8000].map((rate) => (
-                <Button
-                  key={rate}
-                  variant={settings.mouseSettings.pollingRate === rate ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => SettingsActions.setMousePollingRate(rate)}
-                >
-                  {rate}Hz
-                </Button>
-              ))}
+          {/* Mouse Image - Futuristic 3D Design */}
+          <div
+            ref={mouseImageRef}
+            className="flex-1 bg-gradient-to-br from-muted/50 via-background to-muted/30 rounded-lg p-8 border border-border/50 relative overflow-visible flex items-center justify-center"
+            style={{ position: "relative", minHeight: "500px" }}
+          >
+            {/* Background Glow Effect */}
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/5 pointer-events-none rounded-lg" />
+
+            {/* Mouse Image */}
+            <div
+              className="relative w-full max-w-md mx-auto"
+              style={{ maxHeight: "500px" }}
+            >
+              <img
+                src={MouseIcon}
+                alt="Gaming Mouse"
+                className="w-full h-auto object-contain block"
+                style={{ userSelect: "none" }}
+              />
+
+              <svg
+                viewBox="0 0 1000 600"
+                preserveAspectRatio="xMidYMid meet"
+                className="absolute inset-0 w-full h-full"
+
+              >
+                <path
+                  d="M38.6644 166.531L8.16441 207.031L0.664413 225.031L38.6644 238.531L101.664 249.531L178.664 238.531L226.664 214.031L268.164 178.531L309.664 124.531L335.664 74.5309L344.164 41.0309L302.664 14.0309L268.164 0.530853L226.664 14.0309L171.164 56.0309L101.664 111.031L38.6644 166.531Z"
+                  className={`mouse-button ${selectedButton === "left" ? "is-selected" : ""
+                    }`}
+                  style={{ transform: "translate(213px, 185px)" }}
+                  onClick={() => setSelectedButton("left")}
+                />
+
+                <path
+                  className={`mouse-button ${selectedButton === "right" ? "is-selected" : ""
+                    }`}
+                  d="M0.5 219.978V233.978V254.978L10 260.978L25 258.978L49 243.978L72.5 226.478L108 194.978L155.5 151.978L194.5 118.978L229.5 94.4779L268 68.9779L299 50.9779L329.5 32.9779L360.5 10.4779L375 0.477875L355.5 6.47787L320.5 18.9779L289.5 29.9779L250.5 46.4779L204.5 68.9779L136.5 107.478L78 143.478L42 168.478L17 193.478L5.5 206.978L0.5 219.978Z"
+                  fill="rgba(255,0,0,0.6)"
+                  style={{ transform: "translate(117px, 99px)" }}
+                  onClick={() => setSelectedButton("right")}
+                />
+
+                <path
+                  className={`mouse-button ${selectedButton === "button4" ? "is-selected" : ""
+                    }`}
+                  d="M19.5911 47.5L0.591125 71L5.09113 80L13.5911 88H21.5911L31.0911 80L47.5911 69L64.0911 57L79.0911 47.5L95.0911 38L97.5911 26.5L95.0911 17.5L91.5911 8L85.5911 0.5H79.0911L56.5911 14L37.5911 29.5L19.5911 47.5Z"
+                  fill="rgba(255,0,0,0.6)"
+                  style={{ transform: "translate(538px, 240px)" }}
+                  onClick={() => setSelectedButton("button4")}
+                />
+
+                <path
+                  className={`mouse-button ${selectedButton === "button5" ? "is-selected" : ""
+                    }`}
+                  d="M8.87897 6L0.878967 9L8.87897 17.5L13.379 26.5L15.879 33.5V40.5L13.379 46L20.379 43L35.379 38.5L50.879 33.5L64.379 29.5L79.379 26.5H88.379L93.379 21.5L97.379 15L93.379 6L85.379 0.5H70.379H56.879H40.879L24.379 3L8.87897 6Z"
+                  fill="rgba(255,0,0,0.6)"
+                  style={{ transform: "translate(623px, 233px)" }}
+                  onClick={() => setSelectedButton("button5")}
+                />
+
+                <path
+                  className={`mouse-button ${selectedButton === "wheel" ? "is-selected" : ""
+                    }`}
+                  d="M4 112.5L13 117L20 110.5L34.5 98.5L52.5 83.5L76.5 62L100 42.5L123 21.5L131.5 14L126.5 10L114 4L104 0.5H95L78.5 7.5L57 17.5L38 30L20 45.5L11 59.5L7.5 71L0.5 95.5V104L4 112.5Z"
+                  fill="rgba(255,0,0,0.6)"
+                  style={{ transform: "translate(270px, 197px)" }}
+                  onClick={() => setSelectedButton("wheel")}
+                />
+              </svg>
             </div>
+
+            {/* <path
+          d="M520 100 L820 120 L800 320 L500 300 Z"
+          fill={state.right ? "rgba(255,0,0,0.4)" : "transparent"}
+        /> */}
+            {/* <rect
+          x="450"
+          y="150"
+          width="100"
+          height="180"
+          rx="20"
+          fill={state.scroll ? "rgba(0,0,255,0.4)" : "transparent"}
+        /> */}
+
           </div>
+
         </div>
       </div>
 
@@ -487,6 +364,6 @@ export default function MouseSettings() {
           </button>
         </div>
       </div>
-    </div>
+    </div >
   );
 }

@@ -39,3 +39,4 @@ declare module "*.bmp" {
   export default value;
 }
 
+

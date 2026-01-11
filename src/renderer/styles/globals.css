@@ -116,6 +116,26 @@
     scrollbar-color: #404040 #1e1e1e;
   }
 
+  .mouse-button {
+    opacity: 0;
+    fill: rgba(255, 0, 0, 0.4);
+    cursor: pointer;
+    transition: opacity 0.2s ease, fill 0.2s ease;
+  }
+  
+  /* hover veya active */
+  .mouse-button:hover,
+  .mouse-button.mouse-button-active {
+    transition: opacity 0.2s ease, fill 0.2s ease;
+    opacity: 1;
+  }
+
+  .mouse-button.is-selected {
+    transition: opacity 0.2s ease, fill 0.2s ease;
+    fill: rgba(255, 0, 0, 0.6);
+    opacity: 1;
+  }
+
   /* Scrollbar for specific elements */
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
