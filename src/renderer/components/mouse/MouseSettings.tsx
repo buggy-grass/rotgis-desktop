@@ -161,11 +161,12 @@ export default function MouseSettings() {
     });
   };
 
-  useEffect(()=>{
-    if(selectedButton){
+  useEffect(() => {
+    if (selectedButton) {
+      setOpenDropdowns({});
       toggleDropdown(selectedButton);
     }
-  },[selectedButton])
+  }, [selectedButton])
 
   // Close dropdowns when clicking outside
   useEffect(() => {
