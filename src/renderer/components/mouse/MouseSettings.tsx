@@ -100,6 +100,7 @@ export default function MouseSettings() {
   const dropdownRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const buttonRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [selectedButton, setSelectedButton] = useState<string>("");
+  const [onMouseDropdown, setOnMouseDropdown] = useState<string>("");
 
   const dropdownOptions = ["Yaw/Pitch/Roll", "Mouse Doll", "Rotate"];
 
@@ -219,6 +220,8 @@ export default function MouseSettings() {
                 >
                   <button
                     onClick={() => toggleDropdown(button.id)}
+                    onMouseEnter={() => setOnMouseDropdown(button.id)}
+                    onMouseLeave={() => setOnMouseDropdown("")}
                     className="w-full flex items-center justify-between px-4 py-2 bg-card border border-border rounded-lg hover:bg-accent transition-colors text-sm font-medium"
                   >
                     <span>{getButtonValue(button.id)}</span>
@@ -275,14 +278,14 @@ export default function MouseSettings() {
               >
                 <path
                   d="M38.6644 166.531L8.16441 207.031L0.664413 225.031L38.6644 238.531L101.664 249.531L178.664 238.531L226.664 214.031L268.164 178.531L309.664 124.531L335.664 74.5309L344.164 41.0309L302.664 14.0309L268.164 0.530853L226.664 14.0309L171.164 56.0309L101.664 111.031L38.6644 166.531Z"
-                  className={`mouse-button ${selectedButton === "left" ? "is-selected" : ""
+                  className={`mouse-button ${selectedButton === "left" ? "is-selected" : onMouseDropdown == "left" ? "is-active" : ""
                     }`}
                   style={{ transform: "translate(213px, 185px)" }}
                   onClick={() => setSelectedButton("left")}
                 />
 
                 <path
-                  className={`mouse-button ${selectedButton === "right" ? "is-selected" : ""
+                  className={`mouse-button ${selectedButton === "right" ? "is-selected" : onMouseDropdown == "right" ? "is-active" : ""
                     }`}
                   d="M0.5 219.978V233.978V254.978L10 260.978L25 258.978L49 243.978L72.5 226.478L108 194.978L155.5 151.978L194.5 118.978L229.5 94.4779L268 68.9779L299 50.9779L329.5 32.9779L360.5 10.4779L375 0.477875L355.5 6.47787L320.5 18.9779L289.5 29.9779L250.5 46.4779L204.5 68.9779L136.5 107.478L78 143.478L42 168.478L17 193.478L5.5 206.978L0.5 219.978Z"
                   fill="rgba(255,0,0,0.6)"
@@ -291,7 +294,7 @@ export default function MouseSettings() {
                 />
 
                 <path
-                  className={`mouse-button ${selectedButton === "button4" ? "is-selected" : ""
+                  className={`mouse-button ${selectedButton === "button4" ? "is-selected" : onMouseDropdown == "button4" ? "is-active" : ""
                     }`}
                   d="M19.5911 47.5L0.591125 71L5.09113 80L13.5911 88H21.5911L31.0911 80L47.5911 69L64.0911 57L79.0911 47.5L95.0911 38L97.5911 26.5L95.0911 17.5L91.5911 8L85.5911 0.5H79.0911L56.5911 14L37.5911 29.5L19.5911 47.5Z"
                   fill="rgba(255,0,0,0.6)"
@@ -300,7 +303,7 @@ export default function MouseSettings() {
                 />
 
                 <path
-                  className={`mouse-button ${selectedButton === "button5" ? "is-selected" : ""
+                  className={`mouse-button ${selectedButton === "button5" ? "is-selected" : onMouseDropdown == "button5" ? "is-active" : ""
                     }`}
                   d="M8.87897 6L0.878967 9L8.87897 17.5L13.379 26.5L15.879 33.5V40.5L13.379 46L20.379 43L35.379 38.5L50.879 33.5L64.379 29.5L79.379 26.5H88.379L93.379 21.5L97.379 15L93.379 6L85.379 0.5H70.379H56.879H40.879L24.379 3L8.87897 6Z"
                   fill="rgba(255,0,0,0.6)"
@@ -309,7 +312,7 @@ export default function MouseSettings() {
                 />
 
                 <path
-                  className={`mouse-button ${selectedButton === "wheel" ? "is-selected" : ""
+                  className={`mouse-button ${selectedButton === "wheel" ? "is-selected" : onMouseDropdown == "wheel" ? "is-active" : ""
                     }`}
                   d="M4 112.5L13 117L20 110.5L34.5 98.5L52.5 83.5L76.5 62L100 42.5L123 21.5L131.5 14L126.5 10L114 4L104 0.5H95L78.5 7.5L57 17.5L38 30L20 45.5L11 59.5L7.5 71L0.5 95.5V104L4 112.5Z"
                   fill="rgba(255,0,0,0.6)"

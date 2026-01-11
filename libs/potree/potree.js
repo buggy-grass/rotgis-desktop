@@ -84217,7 +84217,7 @@ ENDSEC
 			this.scene = null;
 			this.sceneControls = new Scene();
 
-			this.rotationSpeed = 10;
+			this.rotationSpeed = 20;
 
 			this.fadeFactor = 20;
 			this.wheelDelta = 0;
@@ -84257,7 +84257,7 @@ ENDSEC
 				let mouse = e.drag.end;
 				let domElement = this.viewer.renderer.domElement;
 
-				if (e.drag.mouse === MOUSE$1.LEFT) {
+				if (e.drag.mouse === this.viewer.dragButton) {
 
 					let ray = Utils.mouseToRay(mouse, camera, domElement.clientWidth, domElement.clientHeight);
 					let plane = new Plane().setFromNormalAndCoplanarPoint(
@@ -84285,7 +84285,7 @@ ENDSEC
 							this.viewer.setMoveSpeed(speed);
 						}
 					}
-				} else if (e.drag.mouse === MOUSE$1.MIDDLE) {
+				} else if (e.drag.mouse === this.viewer.rotateButton) {
 					let ndrag = {
 						x: e.drag.lastDrag.x / this.renderer.domElement.clientWidth,
 						y: e.drag.lastDrag.y / this.renderer.domElement.clientHeight
@@ -84366,7 +84366,11 @@ ENDSEC
 			this.addEventListener('mousewheel', scroll);
 			this.addEventListener('mousedown', onMouseDown);
 			this.addEventListener('mouseup', onMouseUp);
-			//this.addEventListener('dblclick', dblclick);
+			// this.addEventListener('dblclick', dblclick);
+		}
+
+		getCurrentMouseOptions(){
+
 		}
 
 		setScene (scene) {
@@ -90114,7 +90118,11 @@ ENDSEC
 			this.transformationTool = null;
 			this.navigationCube = null;
 			this.compass = null;
-			
+			// rotgis
+			this.dragButton = 0b0001;
+			this.rotateButton = 0b0010;
+			this.zoomButton = 0b0100;
+
 			this.skybox = null;
 			this.clock = new Clock();
 			this.background = 'gradient-grid'; // Default background'u gradient-grid olarak ayarla

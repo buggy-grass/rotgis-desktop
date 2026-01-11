@@ -125,7 +125,7 @@
   
   /* hover veya active */
   .mouse-button:hover,
-  .mouse-button.mouse-button-active {
+  .mouse-button.is-active {
     transition: opacity 0.2s ease, fill 0.2s ease;
     opacity: 1;
   }
