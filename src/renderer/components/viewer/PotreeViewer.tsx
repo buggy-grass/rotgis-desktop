@@ -335,7 +335,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       //   material.heightMax = pointCloud.properties.bbox.max.z;
       material.pointSizeType = window.pointSizeType;
       //PointCloudManager.setPointBudget(5000000);
-      PotreeService.setNodeSize(30);
+      PotreeService.setNodeSize(80);
       material.coloringType = 0;
       material.gradientValue = "SPECTRAL";
       window.viewer.setControls(window.viewer.earthControls);

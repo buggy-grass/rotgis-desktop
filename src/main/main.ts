@@ -128,11 +128,57 @@ app.commandLine.appendSwitch("enable-experimental-web-platform-features");
 function createWindow(): void {
   const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
 
+  // Icon path - hem development hem production için çalışır
+  // Windows'ta mutlak path kullanmak önemli
+  let iconPath: string | undefined;
+  
+  if (isDev) {
+    // Development modunda: process.cwd() proje root'una işaret eder
+    const possiblePaths = [
+      path.resolve(process.cwd(), "src", "renderer", "assets", "app", "Untitled.ico"),
+      path.resolve(__dirname, "..", "renderer", "assets", "app", "Untitled.ico"),
+      path.resolve(__dirname, "..", "..", "src", "renderer", "assets", "app", "Untitled.ico"),
+      path.join(process.cwd(), "src", "renderer", "assets", "app", "Untitled.ico"),
+    ];
+    
+    // İlk var olan path'i kullan
+    for (const possiblePath of possiblePaths) {
+      if (fs.existsSync(possiblePath)) {
+        iconPath = possiblePath;
+        break;
+      }
+    }
+  } else {
+    // Production modunda: app.asar içinde veya dışında olabilir
+    const appPath = app.getAppPath().replace(/[\\/]app\.asar$/, "");
+    const possiblePaths = [
+      path.resolve(appPath, "renderer", "assets", "app", "Untitled.ico"),
+      path.resolve(app.getAppPath(), "renderer", "assets", "app", "Untitled.ico"),
+      path.join(process.resourcesPath || appPath, "renderer", "assets", "app", "Untitled.ico"),
+    ];
+    
+    for (const possiblePath of possiblePaths) {
+      if (fs.existsSync(possiblePath)) {
+        iconPath = possiblePath;
+        break;
+      }
+    }
+  }
+
+  // Icon path'i logla (debug için)
+  if (iconPath) {
+    console.log("Icon path:", iconPath);
+    console.log("Icon exists:", fs.existsSync(iconPath));
+  } else {
+    console.warn("Icon file not found! Looking for: src/renderer/assets/app/Untitled.ico");
+  }
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 500,
     minHeight: 400,
+    ...(iconPath && fs.existsSync(iconPath) && { icon: iconPath }), // Sadece varsa icon'u ayarla
     frame: false, // Custom window bar için frame'i kaldır
     webPreferences: {
       nodeIntegration: true, // Webpack-dev-server için gerekli
@@ -982,6 +1028,90 @@ if (process.platform === "win32" && process.env.GPUSET !== "true" && !isDev) {
   }
   // App hazır olmadan önce performans ayarları
   app.whenReady().then(() => {
+    // Windows'ta App User Model ID ayarla (taskbar icon için önemli)
+    if (process.platform === "win32") {
+      app.setAppUserModelId("com.rotgis.desktop");
+    }
+
+    // Windows'ta icon'u app seviyesinde de ayarla (taskbar için)
+    if (process.platform === "win32") {
+      const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
+      let appIconPath: string | undefined;
+      
+      if (isDev) {
+        const possiblePaths = [
+          path.resolve(process.cwd(), "src", "renderer", "assets", "app", "Untitled.ico"),
+          path.resolve(__dirname, "..", "renderer", "assets", "app", "Untitled.ico"),
+          path.resolve(__dirname, "..", "..", "src", "renderer", "assets", "app", "Untitled.ico"),
+        ];
+        
+        for (const possiblePath of possiblePaths) {
+          if (fs.existsSync(possiblePath)) {
+            appIconPath = possiblePath;
+            break;
+          }
+        }
+      } else {
+        const appPath = app.getAppPath().replace(/[\\/]app\.asar$/, "");
+        const possiblePaths = [
+          path.resolve(appPath, "renderer", "assets", "app", "Untitled.ico"),
+          path.resolve(app.getAppPath(), "renderer", "assets", "app", "Untitled.ico"),
+          path.join(process.resourcesPath || appPath, "renderer", "assets", "app", "Untitled.ico"),
+        ];
+        
+        for (const possiblePath of possiblePaths) {
+          if (fs.existsSync(possiblePath)) {
+            appIconPath = possiblePath;
+            break;
+          }
+        }
+      }
+      
+      if (appIconPath && fs.existsSync(appIconPath)) {
+        console.log("Setting app icon for Windows:", appIconPath);
+        // Windows'ta app icon BrowserWindow icon'undan otomatik alınır,
+        // ama emin olmak için burada da ayarlayabiliriz
+      }
+    }
+    
+    // macOS için (eğer varsa)
+    if (process.platform === "darwin") {
+      const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
+      let appIconPath: string | undefined;
+      
+      if (isDev) {
+        const possiblePaths = [
+          path.resolve(process.cwd(), "src", "renderer", "assets", "app", "Untitled.ico"),
+          path.resolve(__dirname, "..", "renderer", "assets", "app", "Untitled.ico"),
+          path.resolve(__dirname, "..", "..", "src", "renderer", "assets", "app", "Untitled.ico"),
+        ];
+        
+        for (const possiblePath of possiblePaths) {
+          if (fs.existsSync(possiblePath)) {
+            appIconPath = possiblePath;
+            break;
+          }
+        }
+      } else {
+        const appPath = app.getAppPath().replace(/[\\/]app\.asar$/, "");
+        const possiblePaths = [
+          path.resolve(appPath, "renderer", "assets", "app", "Untitled.ico"),
+          path.resolve(app.getAppPath(), "renderer", "assets", "app", "Untitled.ico"),
+        ];
+        
+        for (const possiblePath of possiblePaths) {
+          if (fs.existsSync(possiblePath)) {
+            appIconPath = possiblePath;
+            break;
+          }
+        }
+      }
+      
+      if (appIconPath && fs.existsSync(appIconPath)) {
+        app.dock?.setIcon?.(appIconPath);
+      }
+    }
+
     // GPU acceleration kontrolü
     const gpuStatus = app.getGPUFeatureStatus();
     console.log("GPU Feature Status:", JSON.stringify(gpuStatus, null, 2));

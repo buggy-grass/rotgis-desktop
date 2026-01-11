@@ -290,10 +290,10 @@ class PotreeService {
     PotreeService.setFieldofView(60);
     PotreeService.setQuality(false);
     PotreeService.setEdle(true);
-    PotreeService.setRadius(1.4);
+    PotreeService.setRadius(0.8);
     PotreeService.setEDLStrength(0.4);
     PotreeService.setEdleOpacity(1);
-    PotreeService.setNodeSize(30);
+    PotreeService.setNodeSize(80);
     PotreeService.setPointSizeTypes(0);
     window.viewer.setBackground("gradient-grid");
   }

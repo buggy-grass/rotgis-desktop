@@ -37,7 +37,7 @@ const PotreeViewerSettingsDialog: React.FC<PotreeViewerSettingsDialogProps> = ({
     edlStrength: 1.0,
     edleOpacity: 1.0,
     background: "gradient-grid",
-    nodeSize: 30,
+    nodeSize: 80,
     edle: false,
     pointHQ: false,
     pointSizeType: 0,

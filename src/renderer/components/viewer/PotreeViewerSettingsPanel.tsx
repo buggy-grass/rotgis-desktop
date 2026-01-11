@@ -29,11 +29,11 @@ const PotreeViewerSettingsPanel: React.FC<PotreeViewerSettingsPanelProps> = ({
   const [options, setOptions] = useState<ViewerOptions>({
     pointDensity: 10000000,
     fieldOfView: 60,
-    radius: 1.4,
+    radius: 0.8,
     edlStrength: 0.4,
     edleOpacity: 1.0,
     background: "gradient-grid",
-    nodeSize: 30,
+    nodeSize: 80,
     edle: true,
     pointHQ: false,
     pointSizeType: 0,

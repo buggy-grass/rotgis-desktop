@@ -58,6 +58,13 @@ if (process.env.WEBPACK_SERVE) {
           test: /\.json$/,
           type: "json",
         },
+        {
+          test: /\.(png|jpe?g|gif|svg|ico)$/i,
+          type: "asset/resource",
+          generator: {
+            filename: "assets/[name][ext]",
+          },
+        },
       ],
     },
     output: {
@@ -214,6 +221,13 @@ if (process.env.WEBPACK_SERVE) {
           {
             test: /\.json$/,
             type: "json",
+          },
+          {
+            test: /\.(png|jpe?g|gif|svg|ico)$/i,
+            type: "asset/resource",
+            generator: {
+              filename: "assets/[name][ext]",
+            },
           },
         ],
       },

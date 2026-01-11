@@ -1,17 +1,16 @@
-import { useEffect, useState, useCallback } from 'react';
-import { useSelector } from 'react-redux';
-import { Minus, Square, X, TabletSmartphone, Proportions } from 'lucide-react';
-import { Button } from './ui/button';
-import { RootState } from '../store/store';
-import { Menubar } from './ui/menubar';
-import WindowMenu from './menu/WindowMenu';
+import { useEffect, useState, useCallback } from "react";
+import { useSelector } from "react-redux";
+import { Minus, Square, X, Proportions, Settings, Cog } from "lucide-react";
+import { Button } from "./ui/button";
+import { RootState } from "../store/store";
+import WindowMenu from "./menu/WindowMenu";
+import AppIcon from '../assets/app/Untitled.ico';
+import SettingsActions from "../store/actions/SettingsActions";
 
 export function WindowCustomBar() {
   const [isMaximized, setIsMaximized] = useState(false);
   const [electronAPIReady, setElectronAPIReady] = useState(false);
-  
-  // Store'dan veri al
-  const appName = useSelector((state: RootState) => state.appReducer.appName);
+
   const projectState = useSelector((state: RootState) => state.projectReducer);
   const projectName = projectState.project?.project.name || "Untitled Project";
   const isDirty = projectState.isDirty;
@@ -22,10 +21,13 @@ export function WindowCustomBar() {
       if (window.electronAPI) {
         setElectronAPIReady(true);
         // İlk durumu kontrol et
-        window.electronAPI.windowIsMaximized().then(setIsMaximized).catch(() => {
-          // Hata durumunda false olarak ayarla
-          setIsMaximized(false);
-        });
+        window.electronAPI
+          .windowIsMaximized()
+          .then(setIsMaximized)
+          .catch(() => {
+            // Hata durumunda false olarak ayarla
+            setIsMaximized(false);
+          });
         return true;
       }
       return false;
@@ -72,8 +74,8 @@ export function WindowCustomBar() {
     // Cleanup
     return () => {
       if (window.electronAPI) {
-        window.electronAPI.removeAllListeners('window-maximized');
-        window.electronAPI.removeAllListeners('window-unmaximized');
+        window.electronAPI.removeAllListeners("window-maximized");
+        window.electronAPI.removeAllListeners("window-unmaximized");
       }
     };
   }, [electronAPIReady]);
@@ -83,7 +85,7 @@ export function WindowCustomBar() {
       try {
         window.electronAPI.windowMinimize();
       } catch (error) {
-        console.error('Minimize error:', error);
+        console.error("Minimize error:", error);
       }
     }
   }, []);
@@ -93,7 +95,7 @@ export function WindowCustomBar() {
       try {
         window.electronAPI.windowMaximize();
       } catch (error) {
-        console.error('Maximize error:', error);
+        console.error("Maximize error:", error);
       }
     }
   }, []);
@@ -103,15 +105,24 @@ export function WindowCustomBar() {
       try {
         window.electronAPI.windowClose();
       } catch (error) {
-        console.error('Close error:', error);
+        console.error("Close error:", error);
       }
     }
   }, []);
 
   return (
-    <div className="h-8 bg-background border-b border-border flex items-center justify-between select-none drag-region" style={{ zIndex: 10001, position: "relative" }}>
-      {/* Sol taraf - WindowMenu */}
-      <div className="flex items-center gap-2 px-4 no-drag">
+    <div
+      className="h-8 bg-background border-b border-border flex items-center justify-between select-none drag-region"
+      style={{ zIndex: 10001, position: "relative" }}
+    >
+      {/* Sol taraf - App Icon ve WindowMenu */}
+      <div className="flex items-center gap-1 px-4 no-drag">
+        <img 
+          src={AppIcon} 
+          alt="App Icon" 
+          className="h-6 w-6 flex-shrink-0"
+          style={{ objectFit: "contain" }}
+        />
         <WindowMenu />
       </div>
 
@@ -125,6 +136,15 @@ export function WindowCustomBar() {
 
       {/* Sağ taraf - Window kontrol butonları */}
       <div className="flex items-center no-drag">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-none hover:bg-muted mr-2"
+          onClick={() => SettingsActions.setIsOpen(true)}
+          title="Settings"
+        >
+          <Cog className="h-4 w-4" />
+        </Button>
         <Button
           variant="ghost"
           size="icon"
@@ -171,4 +191,3 @@ export function WindowCustomBar() {
     </div>
   );
 }
-
