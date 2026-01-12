@@ -13,6 +13,8 @@ import ProjectService from './services/ProjectService';
 import store, { RootState } from './store/store';
 import { useSelector } from 'react-redux';
 import { LoadingDialog } from './components/dialogs/LoadingDialog';
+import AppConfigService from './services/AppConfigService';
+import SettingsActions from './store/actions/SettingsActions';
 
 // Potree için performans optimizasyonları
 const App = memo(function App() {
@@ -54,17 +56,32 @@ const App = memo(function App() {
     console.log("Current project changed:", project);
   }, [project]);
 
-  // Initialize project and auto-save
+  // Initialize project, config, and auto-save
   useEffect(() => {
-    // Create default project if none exists
-    const projectState = store.getState().projectReducer;
-    if (!projectState.project) {
-      const defaultProject = ProjectService.createNewProject("Untitled Project", "");
-      ProjectActions.setProject(defaultProject);
-    }
+    const initializeApp = async () => {
+      // Load config file
+      try {
+        const configState = await AppConfigService.loadSettingsState();
+        if (configState && Object.keys(configState).length > 0) {
+          // Load all settings at once (without triggering saveConfig)
+          SettingsActions.loadSettings(configState);
+        }
+      } catch (error) {
+        console.error("Error loading app config:", error);
+      }
 
-    // Setup auto-save
-    setupProjectAutoSave();
+      // Create default project if none exists
+      const projectState = store.getState().projectReducer;
+      if (!projectState.project) {
+        const defaultProject = ProjectService.createNewProject("Untitled Project", "");
+        ProjectActions.setProject(defaultProject);
+      }
+
+      // Setup auto-save
+      setupProjectAutoSave();
+    };
+
+    initializeApp();
   }, []);
 
   return (

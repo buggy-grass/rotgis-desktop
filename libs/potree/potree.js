@@ -84256,7 +84256,7 @@ ENDSEC
 				// let camera = this.viewer.scene.camera;
 				let mouse = e.drag.end;
 				let domElement = this.viewer.renderer.domElement;
-
+				console.error(e.drag.mouse)
 				if (e.drag.mouse === this.viewer.dragButton) {
 
 					let ray = Utils.mouseToRay(mouse, camera, domElement.clientWidth, domElement.clientHeight);

@@ -13,12 +13,15 @@ const initialState: ISettingsState = {
   maxMemoryUsage: 8192, // 8GB
   renderQuality: "high",
   mouseSettings: {
-    zoomSpeed: 1.0,
+    zoomSpeed: 40,
     panSpeed: 1.0,
-    rotateSpeed: 1.0,
+    rotationSpeed: 30,
     sensitivity: 1.0,
     invertZoom: false,
     invertPan: false,
+    zoomButton: 2, // Mouse Right (0b0010)
+    rotateButton: undefined, // Not set by default
+    dragButton: 8, // Button 4 (0b1000)
     dpi: 1600,
     pollingRate: 1000, // Hz
     acceleration: false,
@@ -106,7 +109,31 @@ const SettingsReducer: Reducer<ISettingsState, IActionsProps> = (
         ...state,
         mouseSettings: {
           ...state.mouseSettings,
-          rotateSpeed: action.payload.rotateSpeed,
+          rotationSpeed: action.payload.rotationSpeed,
+        },
+      };
+    case "SETTINGS/SET_MOUSE_ZOOM_BUTTON":
+      return {
+        ...state,
+        mouseSettings: {
+          ...state.mouseSettings,
+          zoomButton: action.payload.zoomButton,
+        },
+      };
+    case "SETTINGS/SET_MOUSE_ROTATE_BUTTON":
+      return {
+        ...state,
+        mouseSettings: {
+          ...state.mouseSettings,
+          rotateButton: action.payload.rotateButton,
+        },
+      };
+    case "SETTINGS/SET_MOUSE_DRAG_BUTTON":
+      return {
+        ...state,
+        mouseSettings: {
+          ...state.mouseSettings,
+          dragButton: action.payload.dragButton,
         },
       };
     case "SETTINGS/SET_MOUSE_SENSITIVITY":
@@ -172,6 +199,18 @@ const SettingsReducer: Reducer<ISettingsState, IActionsProps> = (
               : binding
           ),
         },
+      };
+    case "SETTINGS/LOAD_SETTINGS":
+      return {
+        ...state,
+        ...action.payload,
+        mouseSettings: action.payload.mouseSettings
+          ? {
+              ...state.mouseSettings,
+              ...action.payload.mouseSettings,
+            }
+          : state.mouseSettings,
+        isSettingsOpen: state.isSettingsOpen, // Keep open state
       };
     case "SETTINGS/RESET_TO_DEFAULTS":
       return {

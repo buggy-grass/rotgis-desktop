@@ -1,5 +1,6 @@
 import ISettingsState from "../../models/ISettingsState";
 import store from "../store";
+import AppConfigService from "../../services/AppConfigService";
 
 class SettingsActions {
   static getSettingsState(): ISettingsState {
@@ -18,6 +19,7 @@ class SettingsActions {
       type: "SETTINGS/SET_THEME",
       payload: { theme },
     });
+    this.saveConfig();
   }
 
   static setLanguage(language: string) {
@@ -25,6 +27,7 @@ class SettingsActions {
       type: "SETTINGS/SET_LANGUAGE",
       payload: { language },
     });
+    this.saveConfig();
   }
 
   static setAutoSave(autoSave: boolean) {
@@ -32,6 +35,7 @@ class SettingsActions {
       type: "SETTINGS/SET_AUTO_SAVE",
       payload: { autoSave },
     });
+    this.saveConfig();
   }
 
   static setAutoSaveInterval(autoSaveInterval: number) {
@@ -39,6 +43,7 @@ class SettingsActions {
       type: "SETTINGS/SET_AUTO_SAVE_INTERVAL",
       payload: { autoSaveInterval },
     });
+    this.saveConfig();
   }
 
   static setDefaultProjectPath(defaultProjectPath: string) {
@@ -46,6 +51,7 @@ class SettingsActions {
       type: "SETTINGS/SET_DEFAULT_PROJECT_PATH",
       payload: { defaultProjectPath },
     });
+    this.saveConfig();
   }
 
   static setGpuAcceleration(gpuAcceleration: boolean) {
@@ -53,6 +59,7 @@ class SettingsActions {
       type: "SETTINGS/SET_GPU_ACCELERATION",
       payload: { gpuAcceleration },
     });
+    this.saveConfig();
   }
 
   static setMaxMemoryUsage(maxMemoryUsage: number) {
@@ -60,6 +67,7 @@ class SettingsActions {
       type: "SETTINGS/SET_MAX_MEMORY_USAGE",
       payload: { maxMemoryUsage },
     });
+    this.saveConfig();
   }
 
   static setRenderQuality(renderQuality: "low" | "medium" | "high" | "ultra") {
@@ -67,6 +75,7 @@ class SettingsActions {
       type: "SETTINGS/SET_RENDER_QUALITY",
       payload: { renderQuality },
     });
+    this.saveConfig();
   }
 
   static resetToDefaults() {
@@ -81,6 +90,7 @@ class SettingsActions {
       type: "SETTINGS/SET_MOUSE_ZOOM_SPEED",
       payload: { zoomSpeed },
     });
+    this.saveConfig();
   }
 
   static setMousePanSpeed(panSpeed: number) {
@@ -88,13 +98,39 @@ class SettingsActions {
       type: "SETTINGS/SET_MOUSE_PAN_SPEED",
       payload: { panSpeed },
     });
+    this.saveConfig();
   }
 
-  static setMouseRotateSpeed(rotateSpeed: number) {
+  static setMouseRotateSpeed(rotationSpeed: number) {
     store.dispatch({
       type: "SETTINGS/SET_MOUSE_ROTATE_SPEED",
-      payload: { rotateSpeed },
+      payload: { rotationSpeed },
     });
+    this.saveConfig();
+  }
+
+  static setMouseZoomButton(zoomButton?: number) {
+    store.dispatch({
+      type: "SETTINGS/SET_MOUSE_ZOOM_BUTTON",
+      payload: { zoomButton },
+    });
+    this.saveConfig();
+  }
+
+  static setMouseRotateButton(rotateButton?: number) {
+    store.dispatch({
+      type: "SETTINGS/SET_MOUSE_ROTATE_BUTTON",
+      payload: { rotateButton },
+    });
+    this.saveConfig();
+  }
+
+  static setMouseDragButton(dragButton?: number) {
+    store.dispatch({
+      type: "SETTINGS/SET_MOUSE_DRAG_BUTTON",
+      payload: { dragButton },
+    });
+    this.saveConfig();
   }
 
   static setMouseSensitivity(sensitivity: number) {
@@ -143,6 +179,23 @@ class SettingsActions {
     store.dispatch({
       type: "SETTINGS/SET_MOUSE_BUTTON_BINDING",
       payload: { buttonId, keyBinding, action },
+    });
+    this.saveConfig();
+  }
+
+  // Load settings from config file (without saving)
+  static loadSettings(settings: Partial<ISettingsState>) {
+    store.dispatch({
+      type: "SETTINGS/LOAD_SETTINGS",
+      payload: settings,
+    });
+  }
+
+  // Save config file after any setting change
+  private static saveConfig() {
+    const state = store.getState().settingsReducer;
+    AppConfigService.saveSettingsState(state).catch((error) => {
+      console.error("Error saving config:", error);
     });
   }
 }

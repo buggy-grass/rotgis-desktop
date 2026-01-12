@@ -1,6 +1,6 @@
 import path from "path";
 
-interface Coordinate extends Array<number> {}
+interface Coordinate extends Array<number> { }
 
 export interface BoundaryJSON {
   type: "MultiPolygon";
@@ -461,6 +461,18 @@ class PotreeService {
     }
   }
 
+  static setMouseConfigurations(zoomButton?: number, rotateButton?: number, dragButton?: number, zoomSpeed?: number, rotationSpeed?: number) {
+    if (window.viewer) {
+      window.viewer.rotateButton = rotateButton ?? window.viewer.rotateButton;
+      window.viewer.dragButton = dragButton ?? window.viewer.dragButton;
+      window.viewer.zoomButton = zoomButton ?? window.viewer.zoomButton;
+      if (window.viewer.earthControls) {
+        window.viewer.earthControls.fadeFactor = zoomSpeed ?? window.viewer.earthControls.fadeFactor;
+        window.viewer.earthControls.rotationSpeed = rotationSpeed ?? window.viewer.earthControls.rotationSpeed;
+      }
+    }
+  }
+
   static async cropPointCloud(
     selection: "cube" | "polygon",
     name: string = "cropped_pc.laz",
@@ -512,7 +524,7 @@ class PotreeService {
       if (isNaN(pitch) || !isFinite(pitch)) pitch = 0;
       if (isNaN(roll) || !isFinite(roll)) roll = 0;
 
-      let options = [
+      const options = [
         { name: "--run", value: "pdalRotatedCrop" },
         { name: "--i", value: `"${source}"` },
         { name: "--o", value: `"${path.join(tempFolderPath, name)}"` },
@@ -535,7 +547,7 @@ class PotreeService {
       // TODO: box crop
       console.error(options);
     } else {
-      let options = [
+      const options = [
         { name: "--run", value: `pdalCrop` },
         { name: "--i", value: `"${source}"` },
         { name: "--o", value: `"${path.join(tempFolderPath, name)}"` },
@@ -558,9 +570,9 @@ class PotreeService {
 
     console.error(croppedPointCloud);
 
-    if (1 == 1) {
-      throw "failed";
-    }
+    // if (1 == 1) {
+    //   throw "failed";
+    // }
 
     // TO DO import cropped point cloud to the project
 
@@ -569,7 +581,7 @@ class PotreeService {
 
   static async getMaxZInPolygon(source: string, wkt: string) {
     try {
-      let options = [
+      const options = [
         { name: "--run", value: "pdalMaxZInPolygon" },
         { name: "--i", value: source },
         { name: "--wkt", value: `"${wkt}"` },
@@ -601,7 +613,7 @@ class PotreeService {
     }
 
     const pointClouds = window.viewer.scene.pointclouds;
-    
+
     const pointCloud = pointClouds.find((pc: any) => pc.name === pointCloudId);
 
     if (!pointCloud) {
@@ -619,7 +631,7 @@ class PotreeService {
         // Fallback: direct zoom
         window.viewer.zoomTo(pointCloud, 1.0, 500);
       }
-      
+
       // Store the active point cloud ID in a global variable for measurement tracking
       (window as any).activePointCloudId = pointCloudId;
     } catch (error) {
@@ -628,6 +640,7 @@ class PotreeService {
         window.viewer.zoomTo(pointCloud, 1.0, 500);
         (window as any).activePointCloudId = pointCloudId;
       } catch (fallbackError) {
+        console.error(fallbackError)
       }
     }
   }
