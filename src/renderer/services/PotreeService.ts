@@ -463,12 +463,34 @@ class PotreeService {
 
   static setMouseConfigurations(zoomButton?: number, rotateButton?: number, dragButton?: number, zoomSpeed?: number, rotationSpeed?: number) {
     if (window.viewer) {
-      window.viewer.rotateButton = rotateButton ?? window.viewer.rotateButton;
-      window.viewer.dragButton = dragButton ?? window.viewer.dragButton;
-      window.viewer.zoomButton = zoomButton ?? window.viewer.zoomButton;
+      // Eğer değer undefined ise, viewer'daki değeri de undefined yap (veya 0)
+      // ?? operatörü yerine explicit undefined kontrolü yapıyoruz
+      console.error(zoomButton)
+      if (zoomButton !== undefined) {
+        window.viewer.zoomButton = zoomButton;
+      } else {
+        window.viewer.zoomButton = undefined;
+      }
+      
+      if (rotateButton !== undefined) {
+        window.viewer.rotateButton = rotateButton;
+      } else {
+        window.viewer.rotateButton = undefined;
+      }
+      
+      if (dragButton !== undefined) {
+        window.viewer.dragButton = dragButton;
+      } else {
+        window.viewer.dragButton = undefined;
+      }
+      
       if (window.viewer.earthControls) {
-        window.viewer.earthControls.fadeFactor = zoomSpeed ?? window.viewer.earthControls.fadeFactor;
-        window.viewer.earthControls.rotationSpeed = rotationSpeed ?? window.viewer.earthControls.rotationSpeed;
+        if (zoomSpeed !== undefined) {
+          window.viewer.earthControls.fadeFactor = zoomSpeed;
+        }
+        if (rotationSpeed !== undefined) {
+          window.viewer.earthControls.rotationSpeed = rotationSpeed;
+        }
       }
     }
   }

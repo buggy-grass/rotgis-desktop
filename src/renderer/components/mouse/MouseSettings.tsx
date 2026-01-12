@@ -8,58 +8,6 @@ import { ChevronDown } from "lucide-react";
 import MouseIcon from '../../assets/app/settings/mouse.png';
 import PotreeService from "../../services/PotreeService";
 
-interface MouseButton {
-  id: string;
-  name: string;
-  position: { x: number; y: number; width: number; height: number };
-  shape: "rect" | "circle" | "ellipse";
-  color?: string;
-}
-
-const AVAILABLE_KEYS = [
-  "Left Click",
-  "Right Click",
-  "Middle Click",
-  "Button 4",
-  "Button 5",
-  "DPI Switch",
-  "Wheel Up",
-  "Wheel Down",
-  "Scroll Left",
-  "Scroll Right",
-  "Double Click",
-  "Drag",
-  "Zoom In",
-  "Zoom Out",
-  "Pan",
-  "Rotate",
-  "Select",
-  "Measure",
-  "None",
-];
-
-const AVAILABLE_ACTIONS = [
-  "Primary Click",
-  "Secondary Click",
-  "Scroll Click",
-  "Back",
-  "Forward",
-  "Change DPI",
-  "Scroll Up",
-  "Scroll Down",
-  "Pan Left",
-  "Pan Right",
-  "Zoom In",
-  "Zoom Out",
-  "Rotate",
-  "Select",
-  "Measure",
-  "Custom",
-  "None",
-  "Yaw/Pitch/Roll",
-  "Mouse Doll",
-];
-
 interface MouseButtonConfig {
   id: string;
   name: string;
@@ -104,6 +52,7 @@ export default function MouseSettings() {
   const buttonRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [selectedButton, setSelectedButton] = useState<string>("");
   const [onMouseDropdown, setOnMouseDropdown] = useState<string>("");
+  const [pendingDropdownClose, setPendingDropdownClose] = useState<string | null>(null);
 
   const dropdownOptions: ActionType[] = ["Zoom", "Rotation", "Drag", "None"];
 
@@ -112,9 +61,9 @@ export default function MouseSettings() {
     const buttonValue = MOUSE_BUTTONS.find((b) => b.id === buttonId)?.value;
     if (!buttonValue) return "None";
 
-    if (settings.mouseSettings.zoomButton === buttonValue) return "Zoom";
-    if (settings.mouseSettings.rotateButton === buttonValue) return "Rotation";
-    if (settings.mouseSettings.dragButton === buttonValue) return "Drag";
+    if (settings.zoomButton === buttonValue) return "Zoom";
+    if (settings.rotateButton === buttonValue) return "Rotation";
+    if (settings.dragButton === buttonValue) return "Drag";
     return "None";
   };
 
@@ -129,11 +78,11 @@ export default function MouseSettings() {
     };
 
     MOUSE_BUTTONS.forEach((button) => {
-      if (settings.mouseSettings.zoomButton === button.value) {
+      if (settings.zoomButton === button.value) {
         actions[button.id] = "Zoom";
-      } else if (settings.mouseSettings.rotateButton === button.value) {
+      } else if (settings.rotateButton === button.value) {
         actions[button.id] = "Rotation";
-      } else if (settings.mouseSettings.dragButton === button.value) {
+      } else if (settings.dragButton === button.value) {
         actions[button.id] = "Drag";
       }
     });
@@ -143,61 +92,77 @@ export default function MouseSettings() {
 
   // Update PotreeService when settings change
   useEffect(() => {
+    console.error(settings.zoomButton)
     PotreeService.setMouseConfigurations(
-      settings.mouseSettings.zoomButton,
-      settings.mouseSettings.rotateButton,
-      settings.mouseSettings.dragButton,
-      settings.mouseSettings.zoomSpeed,
-      settings.mouseSettings.rotationSpeed
+      settings.zoomButton,
+      settings.rotateButton,
+      settings.dragButton,
+      settings.zoomSpeed,
+      settings.rotationSpeed
     );
   }, [
-    settings.mouseSettings.zoomButton,
-    settings.mouseSettings.rotateButton,
-    settings.mouseSettings.dragButton,
-    settings.mouseSettings.zoomSpeed,
-    settings.mouseSettings.rotationSpeed,
+    settings.zoomButton,
+    settings.rotateButton,
+    settings.dragButton,
+    settings.zoomSpeed,
+    settings.rotationSpeed,
   ]);
 
-  const handleDropdownChange = (buttonId: string, value: ActionType) => {
-    setOpenDropdowns((prev) => ({ ...prev, [buttonId]: false }));
-    setSelectedButton("");
+  // Close dropdown after Redux state has been updated
+  useEffect(() => {
+    if (pendingDropdownClose) {
+      // Redux state güncellendiğinde dropdown'ı kapat
+      // getButtonValue artık güncel state'i okuyacak
+      setOpenDropdowns((prev) => ({ ...prev, [pendingDropdownClose]: false }));
+      setSelectedButton("");
+      setPendingDropdownClose(null);
+    }
+  }, [settings.zoomButton, settings.rotateButton, settings.dragButton, pendingDropdownClose]);
 
+  const handleDropdownChange = (buttonId: string, value: ActionType) => {
     const button = MOUSE_BUTTONS.find((b) => b.id === buttonId);
     if (!button) return;
 
-    // Eğer None seçildiyse, bu butonun action'ını kaldır
+    // ÖNEMLİ: Önce bu butonun mevcut tüm action'larını kaldır (bir buton sadece bir action'a sahip olmalı)
+    // Bu, aynı butonun birden fazla action'a atanmasını önler
+    if (settings.zoomButton === button.value) {
+      SettingsActions.setMouseZoomButton(undefined);
+    }
+    if (settings.rotateButton === button.value) {
+      SettingsActions.setMouseRotateButton(undefined);
+    }
+    if (settings.dragButton === button.value) {
+      SettingsActions.setMouseDragButton(undefined);
+    }
+
+    // Eğer None seçildiyse, sadece yukarıdaki kaldırma işlemi yeterli
     if (value === "None") {
-      // Mevcut action'ları kontrol et ve bu butonu kaldır
-      if (settings.mouseSettings.zoomButton === button.value) {
-        SettingsActions.setMouseZoomButton(undefined);
-      }
-      if (settings.mouseSettings.rotateButton === button.value) {
-        SettingsActions.setMouseRotateButton(undefined);
-      }
-      if (settings.mouseSettings.dragButton === button.value) {
-        SettingsActions.setMouseDragButton(undefined);
-      }
+      // Redux state güncellemesi için bir sonraki render cycle'ı bekle
+      requestAnimationFrame(() => {
+        setPendingDropdownClose(buttonId);
+      });
       return;
     }
 
-    // Aynı action'ı başka bir butonda kullanan varsa, onu undefined yap
+    // Aynı action'ı başka bir butonda kullanan varsa, onu da undefined yap
     const currentActions = getButtonActions();
     Object.keys(currentActions).forEach((key) => {
       if (key !== buttonId && currentActions[key] === value) {
         const otherButton = MOUSE_BUTTONS.find((b) => b.id === key);
         if (!otherButton) return;
 
-        if (value === "Zoom" && settings.mouseSettings.zoomButton === otherButton.value) {
+        if (value === "Zoom" && settings.zoomButton === otherButton.value) {
           SettingsActions.setMouseZoomButton(undefined);
-        } else if (value === "Rotation" && settings.mouseSettings.rotateButton === otherButton.value) {
+        } else if (value === "Rotation" && settings.rotateButton === otherButton.value) {
           SettingsActions.setMouseRotateButton(undefined);
-        } else if (value === "Drag" && settings.mouseSettings.dragButton === otherButton.value) {
+        } else if (value === "Drag" && settings.dragButton === otherButton.value) {
           SettingsActions.setMouseDragButton(undefined);
         }
       }
     });
 
-    // Yeni action'ı bu butona ata (useEffect otomatik olarak PotreeService'i güncelleyecek)
+    // Yeni action'ı bu butona ata
+    // Redux dispatch'ler senkron çalışır, bu yüzden hemen ardından yapabiliriz
     if (value === "Zoom") {
       SettingsActions.setMouseZoomButton(button.value);
     } else if (value === "Rotation") {
@@ -205,6 +170,11 @@ export default function MouseSettings() {
     } else if (value === "Drag") {
       SettingsActions.setMouseDragButton(button.value);
     }
+
+    // Redux state güncellemesi için bir sonraki render cycle'ı bekle
+    requestAnimationFrame(() => {
+      setPendingDropdownClose(buttonId);
+    });
   };
 
   const toggleDropdown = (buttonId: string) => {
@@ -416,17 +386,11 @@ export default function MouseSettings() {
               type="number"
               min="1"
               max="50"
-              value={settings.mouseSettings.zoomSpeed}
+              value={settings.zoomSpeed}
               onChange={(e) => {
                 const value = Math.max(1, Math.min(50, parseInt(e.target.value) || 1));
                 SettingsActions.setMouseZoomSpeed(value);
-                PotreeService.setMouseConfigurations(
-                  settings.mouseSettings.zoomButton,
-                  settings.mouseSettings.rotateButton,
-                  settings.mouseSettings.dragButton,
-                  value,
-                  settings.mouseSettings.rotationSpeed
-                );
+                // PotreeService will be updated by useEffect when Redux state changes
               }}
               className="w-24"
             />
@@ -434,22 +398,16 @@ export default function MouseSettings() {
               type="range"
               min="1"
               max="50"
-              value={settings.mouseSettings.zoomSpeed}
+              value={settings.zoomSpeed}
               onChange={(e) => {
                 const value = parseInt(e.target.value);
                 SettingsActions.setMouseZoomSpeed(value);
-                PotreeService.setMouseConfigurations(
-                  settings.mouseSettings.zoomButton,
-                  settings.mouseSettings.rotateButton,
-                  settings.mouseSettings.dragButton,
-                  value,
-                  settings.mouseSettings.rotationSpeed
-                );
+                // PotreeService will be updated by useEffect when Redux state changes
               }}
               className="flex-1"
             />
             <span className="text-sm text-muted-foreground min-w-[2rem] text-right">
-              {settings.mouseSettings.zoomSpeed}
+              {settings.zoomSpeed}
             </span>
           </div>
         </div>
@@ -472,17 +430,11 @@ export default function MouseSettings() {
               type="number"
               min="1"
               max="50"
-              value={settings.mouseSettings.rotationSpeed}
+              value={settings.rotationSpeed}
               onChange={(e) => {
                 const value = Math.max(1, Math.min(50, parseInt(e.target.value) || 1));
                 SettingsActions.setMouseRotateSpeed(value);
-                PotreeService.setMouseConfigurations(
-                  settings.mouseSettings.zoomButton,
-                  settings.mouseSettings.rotateButton,
-                  settings.mouseSettings.dragButton,
-                  settings.mouseSettings.zoomSpeed,
-                  value
-                );
+                // PotreeService will be updated by useEffect when Redux state changes
               }}
               className="w-24"
             />
@@ -490,22 +442,16 @@ export default function MouseSettings() {
               type="range"
               min="1"
               max="50"
-              value={settings.mouseSettings.rotationSpeed}
+              value={settings.rotationSpeed}
               onChange={(e) => {
                 const value = parseInt(e.target.value);
                 SettingsActions.setMouseRotateSpeed(value);
-                PotreeService.setMouseConfigurations(
-                  settings.mouseSettings.zoomButton,
-                  settings.mouseSettings.rotateButton,
-                  settings.mouseSettings.dragButton,
-                  settings.mouseSettings.zoomSpeed,
-                  value
-                );
+                // PotreeService will be updated by useEffect when Redux state changes
               }}
               className="flex-1"
             />
             <span className="text-sm text-muted-foreground min-w-[2rem] text-right">
-              {settings.mouseSettings.rotationSpeed}
+              {settings.rotationSpeed}
             </span>
           </div>
         </div>
@@ -525,15 +471,15 @@ export default function MouseSettings() {
           <button
             type="button"
             role="checkbox"
-            aria-checked={settings.mouseSettings.acceleration}
+            aria-checked={settings.acceleration}
             onClick={() =>
-              SettingsActions.setMouseAcceleration(!settings.mouseSettings.acceleration)
+              SettingsActions.setMouseAcceleration(!settings.acceleration)
             }
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${settings.mouseSettings.acceleration ? "bg-primary" : "bg-muted"
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${settings.acceleration ? "bg-primary" : "bg-muted"
               }`}
           >
             <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.mouseSettings.acceleration ? "translate-x-6" : "translate-x-1"
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.acceleration ? "translate-x-6" : "translate-x-1"
                 }`}
             />
           </button>

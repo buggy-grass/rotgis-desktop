@@ -6,6 +6,19 @@ class PathService {
   private static appPath: string | null = null;
 
   /**
+   * Ensure electronAPI is available
+   * @private
+   */
+  private static ensureElectronAPI(): void {
+    if (!window.electronAPI) {
+      throw new Error('Electron API not available. Please restart the application.');
+    }
+    if (!window.electronAPI.pathJoin) {
+      throw new Error('pathJoin function not available in Electron API');
+    }
+  }
+
+  /**
    * Get application root path (works in both development and production)
    * @returns Promise<string> Application root path
    */
@@ -15,6 +28,22 @@ class PathService {
     }
 
     try {
+      // Wait for electronAPI to be available (in case of timing issues)
+      let retries = 0;
+      const maxRetries = 50; // 5 seconds max wait (50 * 100ms)
+      while (!window.electronAPI && retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        retries++;
+      }
+
+      if (!window.electronAPI) {
+        throw new Error('Electron API not available. Please restart the application.');
+      }
+
+      if (!window.electronAPI.getAppPath) {
+        throw new Error('getAppPath function not available in Electron API');
+      }
+
       this.appPath = await window.electronAPI.getAppPath();
       return this.appPath;
     } catch (error) {
@@ -30,6 +59,7 @@ class PathService {
    */
   static async getPotreePath(): Promise<string> {
     const appPath = await this.getAppPath();
+    this.ensureElectronAPI();
     return window.electronAPI.pathJoin(appPath, 'libs', 'potree');
   }
 
@@ -39,6 +69,7 @@ class PathService {
    */
   static async getPotreeConverterPath(): Promise<string> {
     const potreePath = await this.getPotreePath();
+    this.ensureElectronAPI();
     return window.electronAPI.pathJoin(potreePath, 'converter', 'PotreeConverter.exe');
   }
 
@@ -49,6 +80,7 @@ class PathService {
    */
   static async getPotreeConverterFile(filename: string): Promise<string> {
     const potreePath = await this.getPotreePath();
+    this.ensureElectronAPI();
     return window.electronAPI.pathJoin(potreePath, 'converter', filename);
   }
 
@@ -59,6 +91,7 @@ class PathService {
    */
   static async getPotreeLoaderFile(filename: string): Promise<string> {
     const potreePath = await this.getPotreePath();
+    this.ensureElectronAPI();
     return window.electronAPI.pathJoin(potreePath, 'loaders', filename);
   }
 
@@ -69,6 +102,7 @@ class PathService {
    */
   static async getPotreeExporterFile(filename: string): Promise<string> {
     const potreePath = await this.getPotreePath();
+    this.ensureElectronAPI();
     return window.electronAPI.pathJoin(potreePath, 'exporter', filename);
   }
 
@@ -79,6 +113,7 @@ class PathService {
    */
   static async getPotreeCSSFile(filename: string): Promise<string> {
     const potreePath = await this.getPotreePath();
+    this.ensureElectronAPI();
     return window.electronAPI.pathJoin(potreePath, 'css', filename);
   }
 
@@ -89,6 +124,7 @@ class PathService {
    */
   static async getPotreeResourceFile(subpath: string): Promise<string> {
     const potreePath = await this.getPotreePath();
+    this.ensureElectronAPI();
     return window.electronAPI.pathJoin(potreePath, 'resources', subpath);
   }
 
@@ -99,6 +135,7 @@ class PathService {
    */
   static async getPotreeWorkerFile(filename: string): Promise<string> {
     const potreePath = await this.getPotreePath();
+    this.ensureElectronAPI();
     return window.electronAPI.pathJoin(potreePath, 'workers', filename);
   }
 
@@ -109,6 +146,7 @@ class PathService {
    */
   static async getLibsFile(subpath: string): Promise<string> {
     const appPath = await this.getAppPath();
+    this.ensureElectronAPI();
     return window.electronAPI.pathJoin(appPath, 'libs', subpath);
   }
 
@@ -120,6 +158,7 @@ class PathService {
    */
   static async getLibsModuleFile(moduleName: string, subpath: string): Promise<string> {
     const appPath = await this.getAppPath();
+    this.ensureElectronAPI();
     return window.electronAPI.pathJoin(appPath, 'libs', moduleName, subpath);
   }
 

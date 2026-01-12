@@ -14,6 +14,7 @@ import ProjectActions from "../../store/actions/ProjectActions";
 import PotreeViewerSettingsPanel from "./PotreeViewerSettingsPanel";
 import { MonitorCog, Settings } from "lucide-react";
 import { Button } from "../ui/button";
+import AppActions from "../../store/actions/AppActions";
 
 const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const potreeRenderAreaRef = React.useRef<HTMLDivElement>(null);
@@ -203,6 +204,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     // Potree ready event'ini dinle
     const handlePotreeReady = () => {
       setIsPotreeReady(true);
+      AppActions.setViewerLoaded(true);
     };
 
     window.addEventListener("potreeReady", handlePotreeReady);

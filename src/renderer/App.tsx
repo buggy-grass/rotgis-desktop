@@ -1,11 +1,6 @@
 import { memo, useEffect, useRef } from 'react';
-import { Button } from './components/ui/button';
-import { WindowCustomBar } from './components/WindowCustomBar';
 import "./services/EventEmitter";
-import PotreeViewer from './components/viewer/PotreeViewer';
 import React from 'react';
-import HeightProfileViewer from './components/viewer/HeightProfileViewer';
-import StatusBar from './components/StatusBar';
 import Main from './components/pages/Main';
 import { setupProjectAutoSave } from './services/ProjectAutoSave';
 import ProjectActions from './store/actions/ProjectActions';
@@ -15,42 +10,16 @@ import { useSelector } from 'react-redux';
 import { LoadingDialog } from './components/dialogs/LoadingDialog';
 import AppConfigService from './services/AppConfigService';
 import SettingsActions from './store/actions/SettingsActions';
+import PotreeService from './services/PotreeService';
 
 // Potree için performans optimizasyonları
 const App = memo(function App() {
   // Performance monitoring için ref
+  const viewerLoaded = useSelector((state: RootState) => state.appReducer.viewerLoaded);
   const renderCount = useRef(0);
   renderCount.current += 1;
   const project = useSelector((state: RootState) => state.projectReducer.project);
   // Potree için memory ve performance optimizasyonları
-  useEffect(() => {
-    // RequestAnimationFrame throttling optimizasyonu
-    let rafId: number;
-    let lastFrameTime = performance.now();
-    const targetFPS = 60;
-    const frameInterval = 1000 / targetFPS;
-
-    const optimizedRAF = (callback: FrameRequestCallback) => {
-      const currentTime = performance.now();
-      const elapsed = currentTime - lastFrameTime;
-
-      if (elapsed >= frameInterval) {
-        lastFrameTime = currentTime - (elapsed % frameInterval);
-        callback(currentTime);
-      } else {
-        rafId = requestAnimationFrame(optimizedRAF.bind(null, callback));
-      }
-    };
-
-    // Memory optimizasyonu - unused resources temizleme
-    const cleanup = () => {
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-      }
-    };
-
-    return cleanup;
-  }, []);
 
   useEffect(() => {
     console.log("Current project changed:", project);
@@ -58,31 +27,36 @@ const App = memo(function App() {
 
   // Initialize project, config, and auto-save
   useEffect(() => {
-    const initializeApp = async () => {
-      // Load config file
-      try {
-        const configState = await AppConfigService.loadSettingsState();
-        if (configState && Object.keys(configState).length > 0) {
-          // Load all settings at once (without triggering saveConfig)
-          SettingsActions.loadSettings(configState);
+    if(viewerLoaded){
+      const initializeApp = async () => {
+        // Load config file
+        
+  
+        // Create default project if none exists
+        const projectState = store.getState().projectReducer;
+        if (!projectState.project) {
+          const defaultProject = ProjectService.createNewProject("Untitled Project", "");
+          ProjectActions.setProject(defaultProject);
         }
-      } catch (error) {
-        console.error("Error loading app config:", error);
-      }
-
-      // Create default project if none exists
-      const projectState = store.getState().projectReducer;
-      if (!projectState.project) {
-        const defaultProject = ProjectService.createNewProject("Untitled Project", "");
-        ProjectActions.setProject(defaultProject);
-      }
-
-      // Setup auto-save
-      setupProjectAutoSave();
-    };
-
-    initializeApp();
-  }, []);
+  
+        // Setup auto-save
+        setupProjectAutoSave();
+  
+        try {
+          const configState = await AppConfigService.loadSettingsState();
+          if (configState && Object.keys(configState).length > 0) {
+            // Load all settings at once (without triggering saveConfig)
+            PotreeService.setMouseConfigurations(configState.zoomButton, configState.rotateButton, configState.dragButton, configState.zoomSpeed, configState.rotationSpeed);
+            SettingsActions.loadSettings(configState);
+          }
+        } catch (error) {
+          console.error("Error loading app config:", error);
+        }
+      };
+  
+      initializeApp();
+    }
+  }, [viewerLoaded]);
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">

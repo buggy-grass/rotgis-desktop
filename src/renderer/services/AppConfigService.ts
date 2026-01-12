@@ -28,11 +28,11 @@ class AppConfigService {
     gpuAcceleration: true,
     maxMemoryUsage: 8192,
     renderQuality: "high",
-    zoomButton: 2, // Mouse Right (0b0010)
-    rotateButton: undefined, // Not set by default
-    dragButton: 8, // Button 4 (0b1000)
-    zoomSpeed: 40,
-    rotationSpeed: 30,
+    zoomButton: 8, // Mouse Right (0b0010)
+    rotateButton: 2, // Not set by default
+    dragButton: 1, // Button 4 (0b1000)
+    zoomSpeed: 20,
+    rotationSpeed: 20,
   };
 
   /**
@@ -40,6 +40,12 @@ class AppConfigService {
    */
   private static async getConfigFilePath(): Promise<string> {
     const appPath = await PathService.getAppPath();
+    
+    // Ensure electronAPI is available
+    if (!window.electronAPI || !window.electronAPI.pathJoin) {
+      throw new Error('Electron API not available. Please restart the application.');
+    }
+    
     return window.electronAPI.pathJoin(appPath, this.configFileName);
   }
 
@@ -135,7 +141,7 @@ class AppConfigService {
    */
   private static serializeConfig(config: AppConfig): string {
     const lines: string[] = [];
-    
+
     lines.push(`autoSave = ${config.autoSave}`);
     lines.push(`theme = ${config.theme}`);
     lines.push(`language = ${config.language}`);
@@ -144,15 +150,22 @@ class AppConfigService {
     lines.push(`gpuAcceleration = ${config.gpuAcceleration}`);
     lines.push(`maxMemoryUsage = ${config.maxMemoryUsage}`);
     lines.push(`renderQuality = ${config.renderQuality}`);
-    
-    if (config.zoomButton !== undefined) {
-      lines.push(`zoomButton = 0b${config.zoomButton.toString(2)}`);
+
+    // Only write button values if they are defined and not 0
+    if (config.zoomButton !== undefined && config.zoomButton !== null && config.zoomButton !== 0) {
+      const binaryValue = config.zoomButton.toString(2);
+      lines.push(`zoomButton = 0b${binaryValue}`);
+      console.log("Serializing zoomButton:", config.zoomButton, "as 0b" + binaryValue);
     }
-    if (config.rotateButton !== undefined) {
-      lines.push(`rotateButton = 0b${config.rotateButton.toString(2)}`);
+    if (config.rotateButton !== undefined && config.rotateButton !== null && config.rotateButton !== 0) {
+      const binaryValue = config.rotateButton.toString(2);
+      lines.push(`rotateButton = 0b${binaryValue}`);
+      console.log("Serializing rotateButton:", config.rotateButton, "as 0b" + binaryValue);
     }
-    if (config.dragButton !== undefined) {
-      lines.push(`dragButton = 0b${config.dragButton.toString(2)}`);
+    if (config.dragButton !== undefined && config.dragButton !== null && config.dragButton !== 0) {
+      const binaryValue = config.dragButton.toString(2);
+      lines.push(`dragButton = 0b${binaryValue}`);
+      console.log("Serializing dragButton:", config.dragButton, "as 0b" + binaryValue);
     }
     if (config.zoomSpeed !== undefined) {
       lines.push(`zoomSpeed = ${config.zoomSpeed}`);
@@ -177,11 +190,11 @@ class AppConfigService {
       gpuAcceleration: state.gpuAcceleration,
       maxMemoryUsage: state.maxMemoryUsage,
       renderQuality: state.renderQuality,
-      zoomButton: state.mouseSettings.zoomButton,
-      rotateButton: state.mouseSettings.rotateButton,
-      dragButton: state.mouseSettings.dragButton,
-      zoomSpeed: state.mouseSettings.zoomSpeed,
-      rotationSpeed: state.mouseSettings.rotationSpeed,
+      zoomButton: state.zoomButton,
+      rotateButton: state.rotateButton,
+      dragButton: state.dragButton,
+      zoomSpeed: state.zoomSpeed,
+      rotationSpeed: state.rotationSpeed
     };
   }
 
@@ -198,21 +211,12 @@ class AppConfigService {
       gpuAcceleration: config.gpuAcceleration,
       maxMemoryUsage: config.maxMemoryUsage,
       renderQuality: config.renderQuality,
-      mouseSettings: {
-        zoomButton: config.zoomButton,
-        rotateButton: config.rotateButton,
-        dragButton: config.dragButton,
-        zoomSpeed: config.zoomSpeed ?? 40,
-        rotationSpeed: config.rotationSpeed ?? 30,
-        panSpeed: 1.0,
-        sensitivity: 1.0,
-        invertZoom: false,
-        invertPan: false,
-        dpi: 1600,
-        pollingRate: 1000,
-        acceleration: false,
-        buttonBindings: [],
-      },
+      zoomButton: config.zoomButton,
+      rotateButton: config.rotateButton,
+      dragButton: config.dragButton,
+      zoomSpeed: config.zoomSpeed ?? 20,
+      rotationSpeed: config.rotationSpeed ?? 20,
+      acceleration: false
     };
   }
 
@@ -222,12 +226,12 @@ class AppConfigService {
   static async loadConfig(): Promise<AppConfig | null> {
     try {
       const configPath = await this.getConfigFilePath();
-      
+
       // Try to read file
       try {
         const content = await window.electronAPI.readProjectXML(configPath);
         const parsed = this.parseConfigFile(content);
-        
+
         if (!parsed) {
           // Invalid format, delete and recreate
           try {
@@ -242,7 +246,7 @@ class AppConfigService {
           }
           return this.defaultConfig;
         }
-        
+
         return parsed;
       } catch (readError: any) {
         // File doesn't exist (ENOENT) or can't be read, create default

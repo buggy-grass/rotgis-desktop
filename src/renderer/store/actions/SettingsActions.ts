@@ -173,6 +173,7 @@ class SettingsActions {
       type: "SETTINGS/SET_MOUSE_ACCELERATION",
       payload: { acceleration },
     });
+    this.saveConfig();
   }
 
   static setMouseButtonBinding(buttonId: string, keyBinding: string, action: string) {
@@ -192,11 +193,29 @@ class SettingsActions {
   }
 
   // Save config file after any setting change
+  // Use debounce to batch multiple rapid changes and ensure Redux state is updated
+  private static saveConfigTimer: NodeJS.Timeout | null = null;
+  private static readonly SAVE_CONFIG_DEBOUNCE_MS = 300; // 300ms debounce
+  
   private static saveConfig() {
-    const state = store.getState().settingsReducer;
-    AppConfigService.saveSettingsState(state).catch((error) => {
-      console.error("Error saving config:", error);
-    });
+    // Clear existing timer
+    if (this.saveConfigTimer) {
+      clearTimeout(this.saveConfigTimer);
+    }
+    
+    // Debounce: Wait for Redux state to update and batch rapid changes
+    this.saveConfigTimer = setTimeout(() => {
+      // Get the latest state from Redux store
+      const state = store.getState().settingsReducer;
+      
+      // Debug: Log the values being saved
+      console.log("Saving config - zoomButton:", state.zoomButton, "rotateButton:", state.rotateButton, "dragButton:", state.dragButton);
+      
+      AppConfigService.saveSettingsState(state).catch((error) => {
+        console.error("Error saving config:", error);
+      });
+      this.saveConfigTimer = null;
+    }, this.SAVE_CONFIG_DEBOUNCE_MS);
   }
 }
 

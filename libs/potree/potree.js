@@ -83058,18 +83058,35 @@ ENDSEC
 			let consume = () => { return consumed = true; };
 			if (this.hoveredElements.length === 0) {
 				for (let inputListener of this.getSortedListeners()) {
+					let button = e.button;
+					if(e.button == 3){
+						button = 8
+					}
+					if(e.button == 4){
+						button = 16
+					}
+
 					inputListener.dispatchEvent({
 						type: 'mousedown',
 						viewer: this.viewer,
+						button: button,
 						mouse: this.mouse
 					});
 				}
 			}else {
 				for(let hovered of this.hoveredElements){
 					let object = hovered.object;
+					let button = e.button;
+					if(e.button == 3){
+						button = 8
+					}
+					if(e.button == 4){
+						button = 16
+					}
 					object.dispatchEvent({
 						type: 'mousedown',
 						viewer: this.viewer,
+						button: button,
 						consume: consume
 					});
 
@@ -84256,7 +84273,6 @@ ENDSEC
 				// let camera = this.viewer.scene.camera;
 				let mouse = e.drag.end;
 				let domElement = this.viewer.renderer.domElement;
-				console.error(e.drag.mouse)
 				if (e.drag.mouse === this.viewer.dragButton) {
 
 					let ray = Utils.mouseToRay(mouse, camera, domElement.clientWidth, domElement.clientHeight);
@@ -84340,6 +84356,10 @@ ENDSEC
 					this.camStart = this.scene.getActiveCamera().clone();
 					this.pivotIndicator.visible = true;
 					this.pivotIndicator.position.copy(I.location);
+				}
+
+				if(e.button == this.viewer.zoomButton){
+					this.zoomToLocation(e.mouse);
 				}
 			};
 
@@ -90121,7 +90141,7 @@ ENDSEC
 			// rotgis
 			this.dragButton = 0b0001;
 			this.rotateButton = 0b0010;
-			this.zoomButton = 0b0100;
+			this.zoomButton = 0b10000;
 
 			this.skybox = null;
 			this.clock = new Clock();
@@ -91302,9 +91322,7 @@ ENDSEC
 		}
 
 		loadGUI(callback){
-			console.error("-----------------------------------loadedGUI")
 			if(callback){
-				console.error("-----------------------------------loadedGUI")
 				this.onGUILoaded(callback);
 			}
 

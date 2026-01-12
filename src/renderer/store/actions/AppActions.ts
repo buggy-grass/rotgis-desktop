@@ -20,6 +20,13 @@ class AppActions {
     });
   }
 
+  static setViewerLoaded(viewerLoaded: boolean){
+    store.dispatch({
+      type: "APP_REDUCER/SET_VIEWER_LOADED",
+      payload: { viewerLoaded },
+    });
+  }
+
   static setLoading(isLoading: boolean) {
     store.dispatch({
       type: "APP_REDUCER/SET_LOADING",

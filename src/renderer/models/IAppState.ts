@@ -6,5 +6,6 @@ export default interface IAppState {
     percentage: number;
     message: string;
   };
+  viewerLoaded: boolean;
 }
 
