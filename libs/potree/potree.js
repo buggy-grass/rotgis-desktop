@@ -51844,8 +51844,8 @@
 			this.sprite = new Sprite(this.material);
 			this.add(this.sprite);
 
-			this.borderThickness = 4;
-			this.fontface = 'Arial';
+			this.borderThickness = 3;
+			this.fontface = 'Verdana';
 			this.fontsize = 28;
 			this.borderColor = { r: 0, g: 0, b: 0, a: 1.0 };
 			this.backgroundColor = { r: 255, g: 255, b: 255, a: 1.0 };
@@ -51906,7 +51906,7 @@
 
 			context.lineWidth = this.borderThickness;
 			this.roundRect(context, this.borderThickness / 2, this.borderThickness / 2,
-				textWidth + this.borderThickness + 2 * margin, this.fontsize * 1.4 + this.borderThickness, 6);
+				textWidth + this.borderThickness + 2 * margin, this.fontsize * 1.4 + this.borderThickness, 0);
 
 			// text color
 			context.strokeStyle = 'rgba(0, 0, 0, 1.0)';
@@ -53931,9 +53931,9 @@
 	function createHeightLabel(){
 		const heightLabel = new TextSprite('');
 
-		heightLabel.setTextColor({r: 140, g: 250, b: 140, a: 1.0}); // Modern blue color matching UI
-		heightLabel.setBorderColor({r: 0, g: 0, b: 0, a: 1.0});
-		heightLabel.setBackgroundColor({r: 0, g: 0, b: 0, a: 1.0});
+		heightLabel.setTextColor({r: 255, g: 255, b: 255, a: 1.0}); // Modern blue color matching UI
+		heightLabel.setBorderColor({r: 0, g: 255, b: 0, a: 0.4});
+		heightLabel.setBackgroundColor({r: 0, g: 255, b: 0, a: 0.4});
 		heightLabel.fontsize = 16;
 		heightLabel.material.depthTest = false;
 		heightLabel.material.opacity = 1;
@@ -53945,9 +53945,9 @@
 	function createAreaLabel(){
 		const areaLabel = new TextSprite('');
 
-		areaLabel.setTextColor({r: 140, g: 250, b: 140, a: 1.0}); // Modern blue color matching UI
-		areaLabel.setBorderColor({r: 0, g: 0, b: 0, a: 1.0});
-		areaLabel.setBackgroundColor({r: 0, g: 0, b: 0, a: 1.0});
+		areaLabel.setTextColor({r: 255, g: 255, b: 255, a: 1.0}); // Modern blue color matching UI
+		areaLabel.setBorderColor({r: 0, g: 255, b: 0, a: 0.4});
+		areaLabel.setBackgroundColor({r: 0, g: 255, b: 0, a: 0.4});
 		areaLabel.fontsize = 16;
 		areaLabel.material.depthTest = false;
 		areaLabel.material.opacity = 1;
@@ -54276,20 +54276,20 @@
 
 			{ // edge labels
 				let edgeLabel = new TextSprite();
-				edgeLabel.setBorderColor({r: 0, g: 0, b: 0, a: 1.0});
-				edgeLabel.setBackgroundColor({r: 0, g: 0, b: 0, a: 1.0});
+				edgeLabel.setBorderColor({r: 255, g: 0, b: 0, a: 0.2});
+				edgeLabel.setBackgroundColor({r: 255, g: 0, b: 0, a: 0.2});
 				edgeLabel.material.depthTest = false;
 				edgeLabel.visible = false;
-				edgeLabel.fontsize = 16;
+				edgeLabel.fontsize = 14;
 				this.edgeLabels.push(edgeLabel);
 				this.add(edgeLabel);
 			}
 
 			{ // angle labels
 				let angleLabel = new TextSprite();
-				angleLabel.setBorderColor({r: 0, g: 0, b: 0, a: 1.0});
-				angleLabel.setBackgroundColor({r: 0, g: 0, b: 0, a: 1.0});
-				angleLabel.fontsize = 16;
+				angleLabel.setBorderColor({r: 255, g: 0, b: 0, a: 0.2});
+				angleLabel.setBackgroundColor({r: 255, g: 0, b: 0, a: 0.2});
+				angleLabel.fontsize = 14;
 				angleLabel.material.depthTest = false;
 				angleLabel.material.opacity = 1;
 				angleLabel.visible = false;
@@ -54299,9 +54299,10 @@
 
 			{ // coordinate labels
 				let coordinateLabel = new TextSprite();
-				coordinateLabel.setBorderColor({r: 0, g: 0, b: 0, a: 1.0});
-				coordinateLabel.setBackgroundColor({r: 0, g: 0, b: 0, a: 1.0});
-				coordinateLabel.fontsize = 16;
+				coordinateLabel.setBorderColor({r: 255, g: 0, b: 0, a: 0.2});
+				coordinateLabel.setBackgroundColor({r: 255, g: 0, b: 0, a: 0.2});
+				coordinateLabel.style
+				coordinateLabel.fontsize = 14;
 				coordinateLabel.material.depthTest = false;
 				coordinateLabel.material.opacity = 1;
 				coordinateLabel.visible = false;
@@ -90174,7 +90175,6 @@ ENDSEC
 			{
 				let canvas = this.renderer.domElement;
 				canvas.addEventListener("webglcontextlost", (e) => {
-					console.log(e);
 					this.postMessage("WebGL context lost. \u2639");
 
 					let gl = this.renderer.getContext();
