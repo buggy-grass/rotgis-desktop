@@ -483,6 +483,14 @@ function createWindow(): void {
               const path = require('path');
               return path.join(...paths);
             },
+            pathDirname: (...paths) => {
+              const path = require('path');
+              return path.dirname(...paths);
+            },
+            pathBasename: (...paths) => {
+              const path = require('path');
+              return path.basename(...paths);
+            },
             executeCommand: (options) => {
               return ipcRenderer.invoke('execute-command', options);
             },

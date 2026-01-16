@@ -207,7 +207,7 @@ class PointCloudService {
 
           const pointCloud: PointCloud = {
             id: pointCloudId,
-            name: metadata.name || "Point Cloud",
+            name: window.electronAPI.pathBasename(filePath) || "Point Cloud",
             fileType: "pc",
             extension: fileExtension,
             asset: window.electronAPI.pathJoin(
@@ -282,7 +282,7 @@ class PointCloudService {
 
           const pointCloud: PointCloud = {
             id: id,
-            name: fallbackFileName,
+            name: window.electronAPI.pathBasename(filePath),
             fileType: "pc",
             extension: fileExtension,
             asset: id,

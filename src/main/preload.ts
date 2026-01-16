@@ -107,5 +107,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pathDirname: (filePath: string) => {
     return path.dirname(filePath);
   },
+  pathBasename: (filePath: string) => {
+    return path.basename(filePath);
+  },
 });
 

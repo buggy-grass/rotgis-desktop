@@ -43,6 +43,7 @@ export interface ElectronAPI {
   copyFile: (sourcePath: string, destinationPath: string) => Promise<void>;
   pathJoin: (...paths: string[]) => string;
   pathDirname: (filePath: string) => string;
+  pathBasename: (filePath: string) => string;
 }
 
 declare global {

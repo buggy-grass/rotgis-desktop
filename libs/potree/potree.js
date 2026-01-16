@@ -53979,7 +53979,7 @@
 		]);
 
 		const lineMaterial = new LineMaterial({ 
-			color: 0x3b82f6, // Modern blue color matching UI 
+			color: 0xC750FA, // Modern blue color matching UI 
 			linewidth: 2, 
 			resolution:  new Vector2(1000, 1000),
 			gapSize: 1,
@@ -54024,7 +54024,7 @@
 		geometry.setPositions(coordinates);
 
 		const material = new LineMaterial({ 
-			color: 0x3b82f6, // Modern blue color matching UI
+			color: 0xC750FA, // Modern blue color matching UI
 			dashSize: 5, 
 			gapSize: 2,
 			linewidth: 2, 
@@ -54042,7 +54042,7 @@
 
 	function createCircleCenter(){
 		const bg = new BoxGeometry(1, 1, 1);
-		const sm = new MeshLambertMaterial({ color: 0x3b82f6 });
+		const sm = new MeshLambertMaterial({ color: 0xC750FA });
 		
 		const circleCenter = new Mesh(bg, sm);
 		circleCenter.visible = false;
@@ -54059,7 +54059,7 @@
 		]);
 
 		const material = new LineMaterial({ 
-			color: 0x3b82f6, // Modern blue color matching UI
+			color: 0xC750FA, // Modern blue color matching UI
 			linewidth: 2, 
 			resolution:  new Vector2(1000, 1000),
 			gapSize: 1,
@@ -54104,7 +54104,7 @@
 		geometry.setPositions(coordinates);
 
 		const material = new LineMaterial({
-			color: 0x3b82f6, // Modern blue color matching UI
+			color: 0xC750FA, // Modern blue color matching UI
 			dashSize: 5, 
 			gapSize: 2,
 			linewidth: 2, 
@@ -54137,7 +54137,7 @@
 		};
 
 		const bg = new BoxGeometry(1, 1, 1);
-		const sm = new MeshLambertMaterial({ color: 0x3b82f6 });
+		const sm = new MeshLambertMaterial({ color: 0xC750FA });
 
 		{
 			const label = new TextSprite("");
@@ -54197,7 +54197,7 @@
 		this.maxMarkers = Number.MAX_SAFE_INTEGER;
 
 		this.markerGeometry = new BoxGeometry(0.6, 0.6, 0.6);
-		this.color = new Color(0x3b82f6); // Modern blue color matching UI
+		this.color = new Color(0xC750FA); // Modern blue color matching UI
 
 			this.spheres = [];
 			this.edges = [];
@@ -54260,8 +54260,8 @@
 				]);
 
 		let lineMaterial = new LineMaterial({
-			color: 0x3b82f6, // Modern blue color matching UI
-					linewidth: 1, 
+			color: 0xC750FA, // Modern blue color matching UI
+					linewidth: 1.5, 
 					resolution:  new Vector2(1000, 1000),
 				});
 
@@ -84236,6 +84236,7 @@ ENDSEC
 			this.sceneControls = new Scene();
 
 			this.rotationSpeed = 20;
+			this.rotatePivot = false;
 
 			this.fadeFactor = 20;
 			this.wheelDelta = 0;
@@ -84245,12 +84246,61 @@ ENDSEC
 			this.tweens = [];
 
 			{
-				let sg = new SphereGeometry(1, 16, 16);
-				let sm = new MeshNormalMaterial();
-				this.pivotIndicator = new Mesh(sg, sm);
-				this.pivotIndicator.visible = false;
-				this.sceneControls.add(this.pivotIndicator);
-			}
+				const loader = new THREE.FontLoader();
+				const fontUrl = Potree.resourcePath + "/fonts/helvetiker_regular.typeface.json";
+			  
+				loader.load(fontUrl, (font) => {
+			  
+				  // =========================
+				  // ROTGIS YAZISI (YATAY)
+				  // =========================
+				  const textGeo = new THREE.TextGeometry("RotGIS", {
+					font: font,
+					size: 0.75,
+					height: 0.12,
+					curveSegments: 12,
+					bevelEnabled: true,
+					bevelThickness: 0.1,
+					bevelSize: 0.04,
+					bevelSegments: 5,
+				  });
+			  
+				  textGeo.center();
+			  
+				  const textMat = new THREE.MeshBasicMaterial({
+					color: 0xffffff,
+					transparent: true,
+					opacity: 1,
+					depthTest: false
+				  });
+			  
+				  this.pivotIndicator = new THREE.Mesh(textGeo, textMat);
+				  this.pivotIndicator.visible = false;
+				  this.pivotIndicator.renderOrder = 1000;
+			  
+				  // =========================
+				  // TARGET - HALKA (DAHA BÜYÜK)
+				  // =========================
+				  const ringGeo = new THREE.RingGeometry(2, 2.3, 90); // 🔥 büyütüldü
+				  const ringMat = new THREE.MeshBasicMaterial({
+					color: 0xffffff,
+					transparent: true,
+					opacity: 0.85,
+					depthTest: false,
+					side: THREE.DoubleSide
+				  });
+			  
+				  const ring = new THREE.Mesh(ringGeo, ringMat);
+				  ring.renderOrder = 999;
+			  
+				  // =========================
+				  // HİYERARŞİ
+				  // =========================
+				  this.pivotIndicator.add(ring);
+			  
+				  this.sceneControls.add(this.pivotIndicator);
+				});
+			  }										
 
 			let drag = (e) => {
 				if (e.drag.object !== null) {
@@ -84357,6 +84407,9 @@ ENDSEC
 					this.camStart = this.scene.getActiveCamera().clone();
 					this.pivotIndicator.visible = true;
 					this.pivotIndicator.position.copy(I.location);
+
+					this.rotatePivot = true;
+					this.pivotIndicator.rotation.z = 0.8;
 				}
 
 				if(e.button == this.viewer.zoomButton){
@@ -84372,6 +84425,7 @@ ENDSEC
 				this.camStart = null;
 				this.pivot = null;
 				this.pivotIndicator.visible = false;
+				this.rotatePivot = false;
 			};
 
 			let scroll = (e) => {
@@ -84381,7 +84435,7 @@ ENDSEC
 			let dblclick = (e) => {
 				this.zoomToLocation(e.mouse);
 			};
-
+			  
 			this.addEventListener('drag', drag);
 			this.addEventListener('drop', drop);
 			this.addEventListener('mousewheel', scroll);
@@ -84523,6 +84577,9 @@ ENDSEC
 			}
 
 			if (this.pivotIndicator.visible) {
+				if (this.rotatePivot) {
+					this.pivotIndicator.rotation.z += 0.003;
+				  }
 				let distance = this.pivotIndicator.position.distanceTo(view.position);
 				let pixelwidth = this.renderer.domElement.clientwidth;
 				let pixelHeight = this.renderer.domElement.clientHeight;
@@ -89509,7 +89566,7 @@ ENDSEC
 					]);
 
 		let lineMaterial = new LineMaterial({
-			color: 0x3b82f6, // Modern blue color matching UI
+			color: 0xC750FA, // Modern blue color matching UI
 						linewidth: 2, 
 						resolution:  new Vector2(1000, 1000),
 					});
@@ -89560,7 +89617,7 @@ ENDSEC
 					]);
 
 		let lineMaterial = new LineMaterial({
-			color: 0x3b82f6, // Modern blue color matching UI
+			color: 0xC750FA, // Modern blue color matching UI
 						linewidth: 2, 
 						resolution:  new Vector2(1000, 1000),
 					});
