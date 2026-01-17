@@ -1,4 +1,7 @@
 import path from "path";
+import PathService from "./PathService";
+import DirectoryService from "./DirectoryService";
+import ProjectActions from "../store/actions/ProjectActions";
 
 interface Coordinate extends Array<number> { }
 
@@ -148,7 +151,7 @@ class PotreeService {
     window.viewer.zoomTo(node, 1, 500);
   };
 
-  static deletePointCloud(id: string) {
+  static async deletePointCloud(id: string) {
     if (window.viewer) {
       const pointClouds = window.viewer.scene.pointclouds;
       for (let i = pointClouds.length - 1; i >= 0; i--) {
@@ -212,8 +215,36 @@ class PotreeService {
           //delete sceneNode
           sceneNode = undefined;
           parent.children[childIndex] = geometryNode;
+
+          const pcFolderPath = await PathService.directoryPath(pc.pcoGeometry.loader.url);
+          const exist = await DirectoryService.exist(pcFolderPath);
+          if(exist){
+            await DirectoryService.delete(pcFolderPath);
+            const existPointCloud = ProjectActions.getProjectState().project?.metadata.pointCloud.find((pointCloud) => pointCloud.id == pc.name);
+            if(existPointCloud && existPointCloud.layers){
+              existPointCloud?.layers.forEach(element => {
+               if(element.type == "measurement"){
+                PotreeService.removeMeasurement(element.id);
+               }
+              });
+            }
+            ProjectActions.deletePointCloud(pc.id)
+          }
         }
       }
+    }
+  }
+
+  static async removeMeasurement(id: string){
+    try {
+      if(window.viewer){
+        const existMeasurement = window.viewer.scene.measurements.find((measure: any) => measure.uuid == id);
+        if(existMeasurement){
+          window.viewer.scene.removeMeasurement(existMeasurement);
+        }
+      }
+    } catch (error) {
+      console.error(error);
     }
   }
 
@@ -465,7 +496,6 @@ class PotreeService {
     if (window.viewer) {
       // Eğer değer undefined ise, viewer'daki değeri de undefined yap (veya 0)
       // ?? operatörü yerine explicit undefined kontrolü yapıyoruz
-      console.error(zoomButton)
       if (zoomButton !== undefined) {
         window.viewer.zoomButton = zoomButton;
       } else {
@@ -710,11 +740,8 @@ class PotreeService {
     showEdges: boolean;
     color: number[];
   } {
-    console.error(measurement);
     // Extract points - handle both position.toArray() and position object
     const points: number[][] = measurement.points.map((p: any) => p.position.toArray())
-
-    console.error(points);
 
     // Extract color - handle both color.toArray() and color object
     let color: number[] = [1, 1, 0]; // Default yellow

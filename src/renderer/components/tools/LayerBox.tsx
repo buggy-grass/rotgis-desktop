@@ -172,7 +172,6 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
 
     // Vector Layer (Orthophoto, DSM, DTM) - always show, even if empty
     const vectorChildren: Layer[] = [];
-    console.error(orthophoto, dsm, dtm);
     if (orthophoto && orthophoto.length > 0) {
       vectorChildren.push(
         ...orthophoto.map((ortho) => ({
@@ -424,7 +423,6 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         if (layer.type === "point-cloud" && layer.data) {
           const pc = layer.data as PointCloud;
           PotreeService.deletePointCloud(pc.id);
-          ProjectActions.deletePointCloud(pc.id);
         }
       };
 

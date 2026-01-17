@@ -48,7 +48,6 @@ export function setupProjectAutoSave() {
             currentState.projectFilePath!
           );
           ProjectActions.setDirty(false);
-          console.log("Project auto-saved");
         } catch (error) {
           console.error("Error auto-saving project:", error);
         } finally {

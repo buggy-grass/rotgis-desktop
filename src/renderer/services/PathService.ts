@@ -53,6 +53,14 @@ class PathService {
     }
   }
 
+  static async directoryPath(path: string): Promise<string>{
+    return await window.electronAPI.pathDirname(path);
+  }
+
+  static async fileBaseName(path: string): Promise<string>{
+    return await window.electronAPI.pathBasename(path);
+  }
+
   /**
    * Get Potree library path
    * @returns Promise<string> Path to libs/potree directory

@@ -363,7 +363,6 @@ class PointCloudService {
       // - setter: this._visible = value; dispatchEvent('visibility_changed')
       // Render'da: visiblePointClouds.filter(pc => pc.visible) kullanılıyor
       // PotreeViewer.tsx'te de visible setter kullanılıyor, tutarlılık için burada da kullanalım
-      console.error(existPointCloud)
       existPointCloud._visible = visible; // Potree'nin setter'ını kullan (event dispatch ediyor)
       
       // Redux store'u güncelle

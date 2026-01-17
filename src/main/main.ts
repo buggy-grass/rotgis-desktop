@@ -614,7 +614,7 @@ ipcMain.handle(
 // Delete file or directory
 ipcMain.handle(
   "delete-file",
-  async (_event, filePath: string): Promise<void> => {
+  async (_event, filePath: string): Promise<boolean> => {
     try {
       const normalizedPath = path.normalize(filePath);
       const stats = await fsPromises.stat(normalizedPath);
@@ -624,9 +624,11 @@ ipcMain.handle(
       } else {
         await fsPromises.unlink(normalizedPath);
       }
+
+      return true;
     } catch (error) {
       console.error("Error in delete-file handler:", error);
-      throw error;
+      return false;
     }
   }
 );

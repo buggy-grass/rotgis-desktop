@@ -117,7 +117,6 @@ export async function loadProjectFromFile(filePath: string): Promise<{
   try {
     project = parseProjectXML(xmlString);
 
-    console.error("parseProj", project)
   } catch (error) {
     throw new Error(`Project file is corrupted or invalid: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
