@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useRef } from "react";
 import { useSelector } from "react-redux";
 import PointCloudService from "../../services/PointCloudService";
 import StatusBarActions from "../../store/actions/StatusBarActions";
@@ -26,8 +26,15 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const webGLContextLost = React.useRef(false);
   const viewerLoadedRef = React.useRef(false); // Viewer'ın yüklenip yüklenmediğini takip et
   const loadViewerRef = React.useRef<(() => Promise<void>) | null>(null);
-  const handleContextLostRef = React.useRef<((event: Event) => Promise<void>) | null>(null);
-  const handleContextRestoredRef = React.useRef<(() => Promise<void>) | null>(null);
+  const handleContextLostRef = React.useRef<
+    ((event: Event) => Promise<void>) | null
+  >(null);
+  const handleContextRestoredRef = React.useRef<(() => Promise<void>) | null>(
+    null
+  );
+  const lastX = useRef(0);
+  const lastY = useRef(0);
+  const lastCallTime = useRef(0);
 
   const clear = useCallback(async () => {
     await PointCloudService.removePointClouds();
@@ -75,27 +82,30 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     handleContextRestoredRef.current = handleContextRestored;
   }, [handleContextRestored]);
 
-  const handleContextLost = useCallback(async (event: Event) => {
-    if (event && event.preventDefault) {
-      event.preventDefault(); // 🔴 En önemli satır bu
-    }
-    // console.warn("WebGL context LOST");
-    console.error("❌ WebGL context LOST - PotreeViewer");
-    webGLContextLost.current = true; // UI'ı güncelle
-    // console.error("Context Lost Gerçekleşti");
-    await clear();
-    window.viewer?.renderer?.dispose();
-    window.viewer?.scene?.scene?.dispose();
-    const oldCanvas = window.viewer?.renderer?.domElement;
-    oldCanvas?.remove();
-
-    setTimeout(() => {
-      if (handleContextRestoredRef.current) {
-        handleContextRestoredRef.current();
+  const handleContextLost = useCallback(
+    async (event: Event) => {
+      if (event && event.preventDefault) {
+        event.preventDefault(); // 🔴 En önemli satır bu
       }
-    }, 100);
-    // viewer.scene.dispose() vs. gibi temizleme yapılabilir
-  }, [clear]);
+      // console.warn("WebGL context LOST");
+      console.error("❌ WebGL context LOST - PotreeViewer");
+      webGLContextLost.current = true; // UI'ı güncelle
+      // console.error("Context Lost Gerçekleşti");
+      await clear();
+      window.viewer?.renderer?.dispose();
+      window.viewer?.scene?.scene?.dispose();
+      const oldCanvas = window.viewer?.renderer?.domElement;
+      oldCanvas?.remove();
+
+      setTimeout(() => {
+        if (handleContextRestoredRef.current) {
+          handleContextRestoredRef.current();
+        }
+      }, 100);
+      // viewer.scene.dispose() vs. gibi temizleme yapılabilir
+    },
+    [clear]
+  );
 
   // handleContextLost'u ref'e kaydet
   React.useEffect(() => {
@@ -159,7 +169,11 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         const canvas = canvasRef.current;
         if (canvas) {
           if (handleContextLostRef.current) {
-            canvas.addEventListener("webglcontextlost", handleContextLostRef.current, false);
+            canvas.addEventListener(
+              "webglcontextlost",
+              handleContextLostRef.current,
+              false
+            );
           }
           if (handleContextRestoredRef.current) {
             canvas.addEventListener(
@@ -239,7 +253,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         handleContextLost(data.event);
       } else {
         // Event yoksa yeni bir event oluştur
-        const syntheticEvent = new Event('webglcontextlost');
+        const syntheticEvent = new Event("webglcontextlost");
         handleContextLost(syntheticEvent);
       }
     };
@@ -344,11 +358,14 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
 
       // Set visibility from Redux store
       const projectState = ProjectActions.getProjectState();
-      const pointCloudMetadata = projectState.project?.metadata?.pointCloud?.find((pc) => pc.id === id);
+      const pointCloudMetadata =
+        projectState.project?.metadata?.pointCloud?.find((pc) => pc.id === id);
       if (pointCloudMetadata) {
         const shouldBeVisible = pointCloudMetadata.visible !== false; // Default to true
         e.pointcloud._visible = shouldBeVisible;
-        console.log(`Point cloud ${id} loaded with visibility: ${shouldBeVisible}`);
+        console.log(
+          `Point cloud ${id} loaded with visibility: ${shouldBeVisible}`
+        );
       }
 
       // Don't auto-zoom when loading - let user focus manually via LayerBox
@@ -408,7 +425,9 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   };
 
   // Get project metadata from Redux store
-  const project = useSelector((state: RootState) => state.projectReducer.project);
+  const project = useSelector(
+    (state: RootState) => state.projectReducer.project
+  );
 
   // Track if this is the first load (for initial focus)
   const isFirstLoadRef = React.useRef(true);
@@ -418,9 +437,13 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   // Flag to prevent event listener from adding measurements during loading
   const isLoadingMeasurementsRef = React.useRef(false);
   // Map to store pending measurements and their save timeouts
-  const pendingMeasurementsRef = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const pendingMeasurementsRef = React.useRef<Map<string, NodeJS.Timeout>>(
+    new Map()
+  );
   // Debounce map for marker moved updates (to avoid too frequent updates)
-  const markerMovedDebounceRef = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const markerMovedDebounceRef = React.useRef<Map<string, NodeJS.Timeout>>(
+    new Map()
+  );
 
   // Listen to measurement events and save to Redux
   useEffect(() => {
@@ -449,11 +472,13 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       const measurementName = measurement.name || measurementData.name || "";
       const isHeight = measurementName === "Height" || measurement.showHeight;
       const isAngle = measurementName === "Angle" || measurement.showAngles;
-      
+
       if (isHeight || isAngle) {
         const maxMarkers = measurement.maxMarkers || (isHeight ? 2 : 3);
-        const currentPoints = measurement.points ? measurement.points.length : measurementData.points.length;
-        
+        const currentPoints = measurement.points
+          ? measurement.points.length
+          : measurementData.points.length;
+
         // Don't save if maxMarkers is not reached (drawing not finished)
         if (currentPoints < maxMarkers) {
           return;
@@ -463,20 +488,32 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       // Find which point cloud contains the measurement based on point positions
       // Priority: 1) Active point cloud, 2) Point cloud that contains all measurement points, 3) First visible point cloud
       let targetPointCloudId: string | null = null;
-      
-      if (measurementData.points && measurementData.points.length > 0 && hasValidPoints) {
+
+      if (
+        measurementData.points &&
+        measurementData.points.length > 0 &&
+        hasValidPoints
+      ) {
         // First, check if active point cloud contains the measurement
-        const activePcId = activePointCloudIdRef.current || ((window as any).activePointCloudId || null);
+        const activePcId =
+          activePointCloudIdRef.current ||
+          (window as any).activePointCloudId ||
+          null;
         if (activePcId) {
-          const activePcMetadata = pointClouds.find((pc) => pc.id === activePcId);
+          const activePcMetadata = pointClouds.find(
+            (pc) => pc.id === activePcId
+          );
           if (activePcMetadata) {
             const pcBbox = activePcMetadata.bbox;
             let allPointsInside = true;
             for (const point of measurementData.points) {
               if (
-                point[0] < pcBbox.min.x || point[0] > pcBbox.max.x ||
-                point[1] < pcBbox.min.y || point[1] > pcBbox.max.y ||
-                point[2] < pcBbox.min.z || point[2] > pcBbox.max.z
+                point[0] < pcBbox.min.x ||
+                point[0] > pcBbox.max.x ||
+                point[1] < pcBbox.min.y ||
+                point[1] > pcBbox.max.y ||
+                point[2] < pcBbox.min.z ||
+                point[2] > pcBbox.max.z
               ) {
                 allPointsInside = false;
                 break;
@@ -487,7 +524,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
             }
           }
         }
-        
+
         // If active point cloud doesn't contain it, find the point cloud that contains all points
         if (!targetPointCloudId) {
           for (const pc of pointClouds) {
@@ -495,9 +532,12 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
             let allPointsInside = true;
             for (const point of measurementData.points) {
               if (
-                point[0] < pcBbox.min.x || point[0] > pcBbox.max.x ||
-                point[1] < pcBbox.min.y || point[1] > pcBbox.max.y ||
-                point[2] < pcBbox.min.z || point[2] > pcBbox.max.z
+                point[0] < pcBbox.min.x ||
+                point[0] > pcBbox.max.x ||
+                point[1] < pcBbox.min.y ||
+                point[1] > pcBbox.max.y ||
+                point[2] < pcBbox.min.z ||
+                point[2] > pcBbox.max.z
               ) {
                 allPointsInside = false;
                 break;
@@ -509,7 +549,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
             }
           }
         }
-        
+
         // If no point cloud contains all points, find the one that contains the most points
         if (!targetPointCloudId) {
           let maxPointsInside = 0;
@@ -518,9 +558,12 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
             let pointsInside = 0;
             for (const point of measurementData.points) {
               if (
-                point[0] >= pcBbox.min.x && point[0] <= pcBbox.max.x &&
-                point[1] >= pcBbox.min.y && point[1] <= pcBbox.max.y &&
-                point[2] >= pcBbox.min.z && point[2] <= pcBbox.max.z
+                point[0] >= pcBbox.min.x &&
+                point[0] <= pcBbox.max.x &&
+                point[1] >= pcBbox.min.y &&
+                point[1] <= pcBbox.max.y &&
+                point[2] >= pcBbox.min.z &&
+                point[2] <= pcBbox.max.z
               ) {
                 pointsInside++;
               }
@@ -532,10 +575,13 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
           }
         }
       }
-      
+
       // Last fallback: use active point cloud or first visible point cloud
       if (!targetPointCloudId) {
-        targetPointCloudId = activePointCloudIdRef.current || ((window as any).activePointCloudId || null);
+        targetPointCloudId =
+          activePointCloudIdRef.current ||
+          (window as any).activePointCloudId ||
+          null;
         if (!targetPointCloudId) {
           const loadedPointClouds = window.viewer.scene.pointclouds || [];
           for (const loadedPc of loadedPointClouds) {
@@ -554,8 +600,12 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       if (!targetPointCloudId) return;
 
       // Calculate measurement extent from points
-      let minX = Infinity, minY = Infinity, minZ = Infinity;
-      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+      let minX = Infinity,
+        minY = Infinity,
+        minZ = Infinity;
+      let maxX = -Infinity,
+        maxY = -Infinity,
+        maxZ = -Infinity;
 
       if (measurementData.points && measurementData.points.length > 0) {
         measurementData.points.forEach((point: number[]) => {
@@ -568,15 +618,23 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         });
       } else {
         // Set default extent if no points
-        minX = 0; minY = 0; minZ = 0;
-        maxX = 0; maxY = 0; maxZ = 0;
+        minX = 0;
+        minY = 0;
+        minZ = 0;
+        maxX = 0;
+        maxY = 0;
+        maxZ = 0;
       }
 
       // Determine measurement type from measurement properties
       let measurementType = "point";
       if (measurementData.showArea) {
         measurementType = "area";
-      } else if (measurementData.showDistances && measurementData.points && measurementData.points.length > 2) {
+      } else if (
+        measurementData.showDistances &&
+        measurementData.points &&
+        measurementData.points.length > 2
+      ) {
         measurementType = "polygon";
       } else if (measurementData.points && measurementData.points.length > 1) {
         measurementType = "line";
@@ -595,9 +653,16 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         iconPath = "RulerDimensionLine"; // Height
       } else if (measurementData.showArea && measurementData.showDistances) {
         iconPath = "VectorSquare"; // Area
-      } else if (measurementData.showDistances && !measurementData.showArea && !measurementData.showAngles) {
+      } else if (
+        measurementData.showDistances &&
+        !measurementData.showArea &&
+        !measurementData.showAngles
+      ) {
         iconPath = "Spline"; // Distance
-      } else if (measurementData.points && measurementData.points.length === 1) {
+      } else if (
+        measurementData.points &&
+        measurementData.points.length === 1
+      ) {
         iconPath = "Circle"; // Point
       } else if (measurementData.showAngles) {
         iconPath = "Tangent"; // Angle
@@ -676,7 +741,6 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       // This is just for tracking purposes if needed in the future
     };
 
-
     const handleMeasurementRemoved = (event: any) => {
       const measurement = event.measurement;
       if (!measurement) return;
@@ -705,7 +769,11 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     };
 
     // Helper function to update a measurement layer
-    const updateMeasurementLayerFromPotree = (potreeMeasurement: any, layer: any, pointCloudId: string) => {
+    const updateMeasurementLayerFromPotree = (
+      potreeMeasurement: any,
+      layer: any,
+      pointCloudId: string
+    ) => {
       // Clear existing debounce timeout for this measurement
       const existingTimeout = markerMovedDebounceRef.current.get(layer.id);
       if (existingTimeout) {
@@ -715,11 +783,16 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       // Debounce the update (wait 300ms after last move event)
       const timeout = setTimeout(() => {
         // Update the measurement layer with new data from Potree
-        const measurementData = PotreeService.createMeasurementData(potreeMeasurement);
-        
+        const measurementData =
+          PotreeService.createMeasurementData(potreeMeasurement);
+
         // Calculate new extent from points
-        let minX = Infinity, minY = Infinity, minZ = Infinity;
-        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+        let minX = Infinity,
+          minY = Infinity,
+          minZ = Infinity;
+        let maxX = -Infinity,
+          maxY = -Infinity,
+          maxZ = -Infinity;
 
         if (measurementData.points && measurementData.points.length > 0) {
           measurementData.points.forEach((point: number[]) => {
@@ -731,17 +804,28 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
             maxZ = Math.max(maxZ, point[2]);
           });
         } else {
-          minX = 0; minY = 0; minZ = 0;
-          maxX = 0; maxY = 0; maxZ = 0;
+          minX = 0;
+          minY = 0;
+          minZ = 0;
+          maxX = 0;
+          maxY = 0;
+          maxZ = 0;
         }
 
         // Determine measurement type
         let measurementType = "point";
         if (measurementData.showArea) {
           measurementType = "area";
-        } else if (measurementData.showDistances && measurementData.points && measurementData.points.length > 2) {
+        } else if (
+          measurementData.showDistances &&
+          measurementData.points &&
+          measurementData.points.length > 2
+        ) {
           measurementType = "polygon";
-        } else if (measurementData.points && measurementData.points.length > 1) {
+        } else if (
+          measurementData.points &&
+          measurementData.points.length > 1
+        ) {
           measurementType = "line";
         }
 
@@ -751,9 +835,16 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
           iconPath = "RulerDimensionLine";
         } else if (measurementData.showArea && measurementData.showDistances) {
           iconPath = "VectorSquare";
-        } else if (measurementData.showDistances && !measurementData.showArea && !measurementData.showAngles) {
+        } else if (
+          measurementData.showDistances &&
+          !measurementData.showArea &&
+          !measurementData.showAngles
+        ) {
           iconPath = "Spline";
-        } else if (measurementData.points && measurementData.points.length === 1) {
+        } else if (
+          measurementData.points &&
+          measurementData.points.length === 1
+        ) {
           iconPath = "Circle";
         } else if (measurementData.showAngles) {
           iconPath = "Tangent";
@@ -783,8 +874,11 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
           icon: iconPath,
         };
 
-        ProjectActions.updateMeasurementLayer(pointCloudId, updatedMeasurementLayer);
-        
+        ProjectActions.updateMeasurementLayer(
+          pointCloudId,
+          updatedMeasurementLayer
+        );
+
         // Remove timeout from map after execution
         markerMovedDebounceRef.current.delete(layer.id);
       }, 300);
@@ -810,12 +904,14 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
 
       // Find the measurement layer in Redux
       const pointClouds = project?.metadata?.pointCloud || [];
-      
+
       for (const pc of pointClouds) {
         if (!pc.layers) continue;
-        
-        const layer = pc.layers.find((l) => l.id === measurementId && l.type === "measurement");
-        
+
+        const layer = pc.layers.find(
+          (l) => l.id === measurementId && l.type === "measurement"
+        );
+
         if (layer) {
           updateMeasurementLayerFromPotree(potreeMeasurement, layer, pc.id);
           break; // Found the layer, no need to continue
@@ -837,12 +933,14 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
 
       // Find the measurement layer in Redux
       const pointClouds = project?.metadata?.pointCloud || [];
-      
+
       for (const pc of pointClouds) {
         if (!pc.layers) continue;
-        
-        const layer = pc.layers.find((l) => l.id === measurementId && l.type === "measurement");
-        
+
+        const layer = pc.layers.find(
+          (l) => l.id === measurementId && l.type === "measurement"
+        );
+
         if (layer) {
           updateMeasurementLayerFromPotree(potreeMeasurement, layer, pc.id);
           break; // Found the layer, no need to continue
@@ -855,31 +953,49 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       window.eventBus.on("measurement-finished", handleMeasurementFinished);
       window.eventBus.on("markerMoved", handleMarkerMoved);
     }
-    
-    window.viewer.scene.addEventListener("measurement_added", handleMeasurementAddedWithMarkerListener);
-    window.viewer.scene.addEventListener("measurement_removed", handleMeasurementRemoved);
+
+    window.viewer.scene.addEventListener(
+      "measurement_added",
+      handleMeasurementAddedWithMarkerListener
+    );
+    window.viewer.scene.addEventListener(
+      "measurement_removed",
+      handleMeasurementRemoved
+    );
     window.viewer.scene.addEventListener("marker_dropped", handleMarkerDropped);
-    
+
     // No need to add marker listeners - we only save when measurement-finished event is emitted
 
     return () => {
       if (window.viewer && window.viewer.scene) {
-        window.viewer.scene.removeEventListener("measurement_added", handleMeasurementAddedWithMarkerListener);
-        window.viewer.scene.removeEventListener("measurement_removed", handleMeasurementRemoved);
-        window.viewer.scene.removeEventListener("marker_dropped", handleMarkerDropped);
-        
+        window.viewer.scene.removeEventListener(
+          "measurement_added",
+          handleMeasurementAddedWithMarkerListener
+        );
+        window.viewer.scene.removeEventListener(
+          "measurement_removed",
+          handleMeasurementRemoved
+        );
+        window.viewer.scene.removeEventListener(
+          "marker_dropped",
+          handleMarkerDropped
+        );
+
         // Remove event emitter listener
         if (window.eventBus) {
-          window.eventBus.off("measurement-finished", handleMeasurementFinished);
+          window.eventBus.off(
+            "measurement-finished",
+            handleMeasurementFinished
+          );
           window.eventBus.off("markerMoved", handleMarkerMoved);
         }
-        
+
         // Clear all pending timeouts
         pendingMeasurementsRef.current.forEach((timeout) => {
           clearTimeout(timeout);
         });
         pendingMeasurementsRef.current.clear();
-        
+
         // Clear all marker moved debounce timeouts
         markerMovedDebounceRef.current.forEach((timeout) => {
           clearTimeout(timeout);
@@ -903,24 +1019,26 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     // Check if this is a new point cloud being added (count increased)
     const currentCount = pointClouds.length;
     const isNewPointCloud = currentCount > previousPointCloudCountRef.current;
-    
+
     // Find newly added point cloud IDs (ones not in loadedPointCloudIds)
     const newPointCloudIds = pointClouds
-      .filter(pc => !loadedPointCloudIds.has(pc.id))
-      .map(pc => pc.id);
+      .filter((pc) => !loadedPointCloudIds.has(pc.id))
+      .map((pc) => pc.id);
 
     // Async function to load point clouds with asset validation
     const loadPointClouds = async () => {
       let firstLoadedId: string | null = null;
       const loadedIds: string[] = [];
-      
+
       // Check each point cloud in metadata
       // Use for...of loop to properly handle async operations
       for (const pc of pointClouds) {
         // Skip if already loaded
         if (loadedPointCloudIds.has(pc.id)) {
           // Update visibility for already loaded point clouds
-          const existingPointCloud = window.viewer.scene.pointclouds.find((p: any) => p.name === pc.id);
+          const existingPointCloud = window.viewer.scene.pointclouds.find(
+            (p: any) => p.name === pc.id
+          );
           if (existingPointCloud) {
             const shouldBeVisible = pc.visible !== false; // Default to true
             existingPointCloud._visible = shouldBeVisible;
@@ -930,31 +1048,38 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
 
         // Skip if path or asset is empty
         if (!pc.path || !pc.asset) {
-          console.warn(`Point cloud ${pc.id} has no path or asset, skipping load`);
+          console.warn(
+            `Point cloud ${pc.id} has no path or asset, skipping load`
+          );
           continue;
         }
 
         const project = ProjectActions.getProjectState();
-        
-        if(!project.project?.project.path){
+
+        if (!project.project?.project.path) {
           continue;
         }
 
-        const pointCloudPath = window.electronAPI.pathJoin(project.project?.project.path, pc.asset);
-        
+        const pointCloudPath = window.electronAPI.pathJoin(
+          project.project?.project.path,
+          pc.asset
+        );
+
         // Verify asset exists before loading
         try {
           await window.electronAPI.readProjectXML(pointCloudPath);
           // Asset exists, load it
           loadPointCloud(pointCloudPath, pc.id);
           loadedIds.push(pc.id);
-          
+
           // Track first loaded point cloud for initial focus
           if (!firstLoadedId) {
             firstLoadedId = pc.id;
           }
         } catch (error) {
-          console.warn(`Point cloud asset not found, skipping load: ${pointCloudPath}`);
+          console.warn(
+            `Point cloud asset not found, skipping load: ${pointCloudPath}`
+          );
           // Asset doesn't exist, skip loading
           // Note: Invalid assets are already filtered in loadProject
         }
@@ -964,7 +1089,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       // 1. If this is the first load and we loaded at least one point cloud, focus on the first one
       // 2. If a new point cloud was added, focus on the newly added one (last in newPointCloudIds)
       let focusId: string | null = null;
-      
+
       if (isNewPointCloud && newPointCloudIds.length > 0) {
         // New point cloud added - focus on the last one (most recently added)
         const lastNewId = newPointCloudIds[newPointCloudIds.length - 1];
@@ -1007,44 +1132,64 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
 
       try {
         const pointClouds = project?.metadata?.pointCloud || [];
-        
+
         // Collect all measurements from all point clouds
         const allMeasurements: any[] = [];
-        
+
         for (const pc of pointClouds) {
           if (!pc.layers || pc.layers.length === 0) continue;
 
           // Get measurement layers for this point cloud
-          const measurementLayers = pc.layers.filter((layer) => layer.type === "measurement");
-          
+          const measurementLayers = pc.layers.filter(
+            (layer) => layer.type === "measurement"
+          );
+
           for (const layer of measurementLayers) {
             // Check if measurement already exists in viewer
             const existingMeasurement = window.viewer.scene.measurements.find(
               (m: any) => m.uuid === layer.id
             );
-            
+
             if (existingMeasurement) {
               continue; // Skip if already loaded
             }
 
             // Create measurement data in the format expected by loadMeasurement
             // Use saved points if available, otherwise use extent
-            const points = layer.points && layer.points.length > 0
-              ? layer.points
-              : [
-                  [layer.extent.min.x, layer.extent.min.y, layer.extent.min.z],
-                  [layer.extent.max.x, layer.extent.max.y, layer.extent.max.z],
-                ];
+            const points =
+              layer.points && layer.points.length > 0
+                ? layer.points
+                : [
+                    [
+                      layer.extent.min.x,
+                      layer.extent.min.y,
+                      layer.extent.min.z,
+                    ],
+                    [
+                      layer.extent.max.x,
+                      layer.extent.max.y,
+                      layer.extent.max.z,
+                    ],
+                  ];
 
             const measurementData = {
               uuid: layer.id,
               name: layer.name,
               points: points,
               visible: layer.visible !== false,
-              showDistances: layer.showDistances ?? (layer.measurementType === "line" || layer.measurementType === "polygon"),
+              showDistances:
+                layer.showDistances ??
+                (layer.measurementType === "line" ||
+                  layer.measurementType === "polygon"),
               showCoordinates: layer.showCoordinates ?? false,
-              showArea: layer.showArea ?? (layer.measurementType === "area" || layer.measurementType === "polygon"),
-              closed: layer.closed ?? (layer.measurementType === "polygon" || layer.measurementType === "area"),
+              showArea:
+                layer.showArea ??
+                (layer.measurementType === "area" ||
+                  layer.measurementType === "polygon"),
+              closed:
+                layer.closed ??
+                (layer.measurementType === "polygon" ||
+                  layer.measurementType === "area"),
               showAngles: layer.showAngles ?? false,
               showHeight: layer.showHeight ?? false,
               showCircle: layer.showCircle ?? false,
@@ -1063,7 +1208,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
           for (const measure of allMeasurements) {
             try {
               (window as any).loadMeasurement(window.viewer, measure);
-              
+
               // Set color if available (loadMeasurement doesn't set color)
               const loadedMeasure = window.viewer.scene.measurements.find(
                 (m: any) => m.uuid === measure.uuid
@@ -1076,14 +1221,17 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
                 );
               }
             } catch (error) {
-              console.error(`Error loading measurement ${measure.uuid}:`, error);
+              console.error(
+                `Error loading measurement ${measure.uuid}:`,
+                error
+              );
             }
           }
         } else {
           // Fallback: create measurements manually
           const Measure = window.Potree.Measure;
           const Vector3 = window.THREE.Vector3;
-          
+
           for (const measurementData of allMeasurements) {
             try {
               // Check for duplicate
@@ -1093,7 +1241,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
               if (duplicate) {
                 continue; // Skip if already exists
               }
-              
+
               const measure = new Measure();
               measure.uuid = measurementData.uuid;
               measure.name = measurementData.name;
@@ -1113,7 +1261,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
                 const pos = new Vector3(point[0], point[1], point[2]);
                 measure.addMarker(pos);
               });
-              
+
               // Set color if available
               if (measurementData.color && measurementData.color.length >= 3) {
                 measure.color = new window.THREE.Color(
@@ -1125,7 +1273,10 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
 
               window.viewer.scene.addMeasurement(measure);
             } catch (error) {
-              console.error(`Error loading measurement ${measurementData.uuid}:`, error);
+              console.error(
+                `Error loading measurement ${measurementData.uuid}:`,
+                error
+              );
             }
           }
         }
@@ -1139,41 +1290,49 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   }, [project?.metadata?.pointCloud, isPotreeReady]);
 
   const potreeOnMouseMove = async (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!isMouseWheelHeld && !isObjectMoving) {
-      if (
-        window.viewer &&
-        window.viewer.scene &&
-        window.viewer.scene.pointclouds
-      ) {
-        const pointCloudsArray = window.viewer.scene.pointclouds;
+    const { clientX, clientY } = event;
+    const now = Date.now();
 
-        // Point cloud kontrolü - eğer pointclouds boşsa işlemi sonlandır
-        if (!pointCloudsArray || pointCloudsArray.length === 0) {
-          StatusBarActions.clearCoords();
-          return;
-        }
+    // 1. MİKTAR KONTROLÜ (Distance Threshold):
+    // Fare 5 pikselden az hareket ettiyse ağır hesaplamaya HİÇ girme.
+    const dist = Math.sqrt(
+      Math.pow(clientX - lastX.current, 2) + Math.pow(clientY - lastY.current, 2)
+    );
+    if (dist < 5) return;
 
-        // Native event'i kullanarak daha hassas koordinat hesaplama
-        const nativeEvent = event.nativeEvent;
+    // 2. ZAMAN KONTROLÜ (Throttle):
+    // Saniyede maksimum 20-25 kez çalışmasına izin ver (40-50ms).
+    if (now - lastCallTime.current < 70) return;
 
-        // getMousePointCloudIntersection bir array bekliyor, bu yüzden tüm pointclouds array'ini gönderiyoruz
-        const resultPc = await PointCloudService.mouseCoordListener(
-          nativeEvent,
-          pointCloudsArray
-        );
+    // Durum kontrolleri
+    if (isMouseWheelHeld || isObjectMoving) return;
+    const pointCloudsArray = window.viewer?.scene?.pointclouds;
+    if (!pointCloudsArray || pointCloudsArray.length === 0) return;
 
-        if (resultPc.point.position.x == -1) {
-          StatusBarActions.clearCoords();
-          return;
-        }
+    // Değerleri güncelle
+    lastX.current = clientX;
+    lastY.current = clientY;
+    lastCallTime.current = now;
 
-        // Daha hassas koordinat gösterimi (3 ondalık basamak)
+    // 3. ASIL HESAPLAMA (Ağır İşlem)
+    try {
+      const resultPc = await PointCloudService.mouseCoordListener(
+        event.nativeEvent,
+        pointCloudsArray
+      );
+
+      if (resultPc?.point?.position && resultPc.point.position.x !== -1) {
+        const pos = resultPc.point.position;
         StatusBarActions.setCoordinates(
-          Number(resultPc.point.position.x.toFixed(3)),
-          Number(resultPc.point.position.y.toFixed(3)),
-          Number(resultPc.point.position.z.toFixed(3))
+          Number(pos.x.toFixed(3)),
+          Number(pos.y.toFixed(3)),
+          Number(pos.z.toFixed(3))
         );
+      } else {
+        StatusBarActions.clearCoords();
       }
+    } catch (e) {
+      // Hata durumunda sessizce fail ol (FPS'i korumak için)
     }
   };
 
@@ -1201,7 +1360,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   // display: none yerine visibility ve opacity kullan (WebGL context kaybını önlemek için)
   // Viewer.tsx'de visibility kontrolü yapılıyor, burada her zaman visible olmalı
   const isVisible = display === "block";
-  
+
   return (
     <div
       id="main-potree"
@@ -1248,7 +1407,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
             >
               <MonitorCog className="h-4 w-4 text-[#e5e5e5]" />
             </Button>
-            
+
             {/* Settings Panel */}
             <PotreeViewerSettingsPanel
               open={settingsPanelOpen}
@@ -1287,7 +1446,6 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         >
           <OrbitController />
         </div>
-
 
         <div
           id="potree_container"

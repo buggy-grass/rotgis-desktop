@@ -55297,42 +55297,61 @@
 			return texture;
 		}
 
-		static getMousePointCloudIntersection (mouse, camera, viewer, pointclouds, params = {}) {
-			
+		static getMousePointCloudIntersection(mouse, camera, viewer, pointclouds, params = {}) {
 			let renderer = viewer.renderer;
-			
+			let canvas = renderer.domElement;
+		
+			// 1. Mouse koordinatlarını normalize et (-1 ile +1 arası)
 			let nmouse = {
-				x: (mouse.x / renderer.domElement.clientWidth) * 2 - 1,
-				y: -(mouse.y / renderer.domElement.clientHeight) * 2 + 1
+				x: (mouse.x / canvas.clientWidth) * 2 - 1,
+				y: -(mouse.y / canvas.clientHeight) * 2 + 1
 			};
-
-			let pickParams = {};
-
-			if(params.pickClipped){
-				pickParams.pickClipped = params.pickClipped;
-			}
-
-			pickParams.x = mouse.x;
-			pickParams.y = renderer.domElement.clientHeight - mouse.y;
-
-			let raycaster = new Raycaster();
+		
+			// 2. Raycaster kurulumu
+			let raycaster = new THREE.Raycaster();
 			raycaster.setFromCamera(nmouse, camera);
-			let ray = raycaster.ray;
-
+			let ray = raycaster.ray; // 'ray is not defined' hatasını önlemek için tanımlama
+		
+			// 3. Picking parametrelerini hazırla (Potree picking render için)
+			let pickParams = {
+				x: mouse.x,
+				y: canvas.clientHeight - mouse.y, // WebGL'de Y ekseni aşağıdan yukarıyadır
+				pickClipped: params.pickClipped || false
+			};
+		
 			let selectedPointcloud = null;
 			let closestDistance = Infinity;
 			let closestIntersection = null;
 			let closestPoint = null;
-			
-			for(let pointcloud of pointclouds){
-				let point = pointcloud.pick(viewer, camera, ray, pickParams);
-				
-				if(!point){
-					continue;
+		
+			// Bellek performansını korumak için geçici bir kutu nesnesi (Döngü dışında oluşturuyoruz)
+			const tempBox = new THREE.Box3();
+		
+			for (let pointcloud of pointclouds) {
+				// Görünürlük kontrolü
+				if (!pointcloud || !pointcloud.visible) continue;
+		
+				// --- OPTİMİZASYON BAŞLANGICI ---
+				// Nokta bulutunun sınır kutusunu (Bounding Box) dünya koordinatlarına taşı
+				if (pointcloud.boundingBox) {
+					tempBox.copy(pointcloud.boundingBox).applyMatrix4(pointcloud.matrixWorld);
+					
+					// Eğer ışın (ray), bu kutunun yanından bile geçmiyorsa ağır 'pick' işlemini atla
+					if (!ray.intersectsBox(tempBox)) {
+						continue; 
+					}
 				}
-
+				// --- OPTİMİZASYON BİTİŞİ ---
+		
+				// Potree'nin asıl ağır iş yükü olan 'pick' fonksiyonu
+				let point = pointcloud.pick(viewer, camera, ray, pickParams);
+		
+				if (!point) continue;
+		
+				// Kameraya olan mesafeyi hesapla
 				let distance = camera.position.distanceTo(point.position);
-
+		
+				// En yakındaki noktayı bul (Z-buffer mantığı)
 				if (distance < closestDistance) {
 					closestDistance = distance;
 					selectedPointcloud = pointcloud;
@@ -55340,7 +55359,8 @@
 					closestPoint = point;
 				}
 			}
-
+		
+			// Sonuç döndürme
 			if (selectedPointcloud) {
 				return {
 					location: closestIntersection,
