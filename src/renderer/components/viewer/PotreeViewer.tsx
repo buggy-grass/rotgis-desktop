@@ -35,6 +35,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const lastX = useRef(0);
   const lastY = useRef(0);
   const lastCallTime = useRef(0);
+  const intersectedPointCloud = useRef<string>("");
 
   const clear = useCallback(async () => {
     await PointCloudService.removePointClouds();
@@ -1298,11 +1299,11 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     const dist = Math.sqrt(
       Math.pow(clientX - lastX.current, 2) + Math.pow(clientY - lastY.current, 2)
     );
-    if (dist < 5) return;
+    if (dist < 3) return;
 
     // 2. ZAMAN KONTROLÜ (Throttle):
     // Saniyede maksimum 20-25 kez çalışmasına izin ver (40-50ms).
-    if (now - lastCallTime.current < 70) return;
+    if (now - lastCallTime.current < 65) return;
 
     // Durum kontrolleri
     if (isMouseWheelHeld || isObjectMoving) return;
@@ -1321,8 +1322,13 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         pointCloudsArray
       );
 
-      if (resultPc?.point?.position && resultPc.point.position.x !== -1) {
+      if (resultPc?.point?.position && resultPc.point.position.x !== -1 && project) {
         const pos = resultPc.point.position;
+        const pointCloud = project.metadata.pointCloud.find((pc) => pc.id == resultPc.pointCloudId);
+        if(pointCloud && intersectedPointCloud.current != pointCloud.id){
+          intersectedPointCloud.current = pointCloud.id;
+          StatusBarActions.setPointCloudData(pointCloud?.id, pointCloud?.name, pointCloud?.epsg);
+        }
         StatusBarActions.setCoordinates(
           Number(pos.x.toFixed(3)),
           Number(pos.y.toFixed(3)),

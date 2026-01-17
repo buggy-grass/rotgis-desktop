@@ -1,4 +1,9 @@
 export default interface IStatusBar {
+  pointCloudData: {
+    id: string;
+    name: string,
+    epsg: string
+   };
   coordinates: {
     x: number;
     y: number;

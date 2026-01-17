@@ -13,6 +13,13 @@ class StatusBarActions {
     });
   }
 
+  static setPointCloudData(id: string, name: string, epsg: string) {
+    store.dispatch({
+      type: "STATUS_BAR/SET_POINTCLOUD_DATA",
+      payload: { id, epsg, name },
+    });
+  }
+
   static clearCoords() {
     store.dispatch({
       type: "STATUS_BAR/CLEAR_COORDS",

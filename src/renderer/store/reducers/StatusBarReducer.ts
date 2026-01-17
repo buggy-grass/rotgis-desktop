@@ -3,6 +3,11 @@ import IActionsProps from "../../models/IActionsProps";
 import { Reducer } from "redux";
 
 const initialState: IStatusBar = {
+   pointCloudData: {
+    id: "",
+    name: "",
+    epsg: ""
+   },
   coordinates: {
     x: 0,
     y: 0,
@@ -27,6 +32,15 @@ const StatusBarReducer: Reducer<IStatusBar, IActionsProps> = (
           y: action.payload.y,
           z: action.payload.z,
         },
+      };
+    case "STATUS_BAR/SET_POINTCLOUD_DATA":
+      return {
+        ...state,
+        pointCloudData:{
+          id: action.payload.id,
+          name: action.payload.name,
+          epsg: action.payload.epsg
+        }
       };
     case "STATUS_BAR/CLEAR_COORDS":
       return {

@@ -7,6 +7,7 @@ import WindowsAPI from "./WindowsAPI";
 import { v4 as uuid } from "uuid";
 
 interface IntersectedObject {
+  pointCloudId: string,
   point: {
     position: {
       x: number;
@@ -447,6 +448,7 @@ class PointCloudService {
 
   static async mouseCoordListener(e: any, projects: any) {
     const coords: IntersectedObject = {
+      pointCloudId: "",
       point: {
         position: {
           x: -1,
@@ -462,6 +464,7 @@ class PointCloudService {
       coords.point.position.x = point.position.x;
       coords.point.position.y = point.position.y;
       coords.point.position.z = point.position.z;
+      coords.pointCloudId = result.pointcloud.name;
     }
 
     return coords;
