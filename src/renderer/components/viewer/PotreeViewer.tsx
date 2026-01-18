@@ -1,5 +1,7 @@
 import React, { useEffect, useCallback, useRef } from "react";
 import { useSelector } from "react-redux";
+import { join } from "path";
+import { CENTER, MeshBVH } from "three-mesh-bvh";
 import PointCloudService from "../../services/PointCloudService";
 import StatusBarActions from "../../store/actions/StatusBarActions";
 import PotreeService from "../../services/PotreeService";
@@ -15,6 +17,7 @@ import PotreeViewerSettingsPanel from "./PotreeViewerSettingsPanel";
 import { MonitorCog, Settings } from "lucide-react";
 import { Button } from "../ui/button";
 import AppActions from "../../store/actions/AppActions";
+import MeshService from "../../services/MeshService";
 
 const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const potreeRenderAreaRef = React.useRef<HTMLDivElement>(null);
@@ -36,6 +39,9 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const lastY = useRef(0);
   const lastCallTime = useRef(0);
   const intersectedPointCloud = useRef<string>("");
+  const intersectedMeshModel = useRef<string>("");
+  const lookingModel = useRef<"mesh-model" | "point-cloud" | "none">("none");
+  const meshDebounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const clear = useCallback(async () => {
     await PointCloudService.removePointClouds();
@@ -163,6 +169,29 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
           window.eventBus.emit("heightProfileLoad", {
             viewer: window.viewer,
           });
+        }
+
+        // Add lights to scene for mesh rendering
+        // Check if lights already exist to avoid duplicates
+        const existingLights = window.viewer.scene.scene.children.filter(
+          (child: any) => child.isLight
+        );
+
+        if (existingLights.length === 0) {
+          // Add directional light
+          const directionalLight = new window.THREE.DirectionalLight(
+            0xffffff,
+            0.8
+          );
+          directionalLight.position.set(10, 10, 10);
+          directionalLight.lookAt(new window.THREE.Vector3(0, 0, 0));
+          window.viewer.scene.scenePointCloud.add(directionalLight);
+
+          // Add ambient light for overall illumination
+          const ambientLight = new window.THREE.AmbientLight(0xffffff, 0.4);
+          window.viewer.scene.scenePointCloud.add(ambientLight);
+
+          console.log("Lights added to scene for mesh rendering");
         }
 
         const rotgisCanvas = document.getElementById("rotgis-canvas");
@@ -344,6 +373,11 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     window.Potree.loadPointCloud(pointCloudPath, id, (e: any) => {
       window.viewer.scene.addPointCloud(e.pointcloud);
       //e.pointcloud.position.z = 0;
+
+      // Add type information to point cloud
+      e.pointcloud.modelType = "pc";
+      e.pointcloud.name = id;
+
       const material = e.pointcloud.material;
       material.size = 1;
       // material.pointSizeType = window.Potree.PointSizeType.ATTENUATED;
@@ -949,10 +983,15 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       }
     };
 
+    const handleSetLookingModel = (event: any) => {
+      lookingModel.current = event.type;
+    };
+
     // Listen to event emitter for measurement finished events (primary method)
     if (window.eventBus) {
       window.eventBus.on("measurement-finished", handleMeasurementFinished);
       window.eventBus.on("markerMoved", handleMarkerMoved);
+      window.eventBus.on("setLookingModel", handleSetLookingModel);
     }
 
     window.viewer.scene.addEventListener(
@@ -989,6 +1028,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
             handleMeasurementFinished
           );
           window.eventBus.off("markerMoved", handleMarkerMoved);
+          window.eventBus.off("setLookingModel", handleSetLookingModel);
         }
 
         // Clear all pending timeouts
@@ -1106,6 +1146,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         // Wait a bit for the point cloud to be fully loaded in Potree
         setTimeout(() => {
           console.log(`Focusing on point cloud: ${focusId}`);
+          lookingModel.current = "point-cloud";
           PotreeService.focusToPointCloud(focusId!);
           // Track the focused point cloud as active (PotreeService also sets global variable)
           activePointCloudIdRef.current = focusId;
@@ -1290,55 +1331,402 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     loadPointClouds();
   }, [project?.metadata?.pointCloud, isPotreeReady]);
 
-  const potreeOnMouseMove = async (event: React.MouseEvent<HTMLDivElement>) => {
-    const { clientX, clientY } = event;
-    const now = Date.now();
-
-    // 1. MİKTAR KONTROLÜ (Distance Threshold):
-    // Fare 5 pikselden az hareket ettiyse ağır hesaplamaya HİÇ girme.
-    const dist = Math.sqrt(
-      Math.pow(clientX - lastX.current, 2) + Math.pow(clientY - lastY.current, 2)
-    );
-    if (dist < 3) return;
-
-    // 2. ZAMAN KONTROLÜ (Throttle):
-    // Saniyede maksimum 20-25 kez çalışmasına izin ver (40-50ms).
-    if (now - lastCallTime.current < 65) return;
-
-    // Durum kontrolleri
-    if (isMouseWheelHeld || isObjectMoving) return;
-    const pointCloudsArray = window.viewer?.scene?.pointclouds;
-    if (!pointCloudsArray || pointCloudsArray.length === 0) return;
-
-    // Değerleri güncelle
-    lastX.current = clientX;
-    lastY.current = clientY;
-    lastCallTime.current = now;
-
-    // 3. ASIL HESAPLAMA (Ağır İşlem)
-    try {
-      const resultPc = await PointCloudService.mouseCoordListener(
-        event.nativeEvent,
-        pointCloudsArray
-      );
-
-      if (resultPc?.point?.position && resultPc.point.position.x !== -1 && project) {
-        const pos = resultPc.point.position;
-        const pointCloud = project.metadata.pointCloud.find((pc) => pc.id == resultPc.pointCloudId);
-        if(pointCloud && intersectedPointCloud.current != pointCloud.id){
-          intersectedPointCloud.current = pointCloud.id;
-          StatusBarActions.setPointCloudData(pointCloud?.id, pointCloud?.name, pointCloud?.epsg);
-        }
-        StatusBarActions.setCoordinates(
-          Number(pos.x.toFixed(3)),
-          Number(pos.y.toFixed(3)),
-          Number(pos.z.toFixed(3))
-        );
-      } else {
-        StatusBarActions.clearCoords();
+  // Load mesh function - copied from Viewer3D.tsx and adapted
+  const loadMesh = useCallback(
+    async (id: string, wireframe?: boolean) => {
+      if (!window.viewer) {
+        console.warn("Viewer not ready");
+        return;
       }
-    } catch (e) {
-      // Hata durumunda sessizce fail ol (FPS'i korumak için)
+
+      try {
+        // Dronet projesinde loadMesh başında earthControls set ediliyor
+        window.viewer.setControls(window.viewer.earthControls);
+
+        const project = ProjectActions.getProjectState();
+        if (!project.project) {
+          console.error("No project loaded");
+          return;
+        }
+
+        // Find mesh by ID
+        const meshData = project.project.metadata.mesh.find((m) => m.id === id);
+        if (!meshData) {
+          console.error(`Mesh with ID ${id} not found`);
+          return;
+        }
+
+        const projectPath = project.project.project.path;
+        // Get directory path from mesh path (remove filename)
+        // meshData.path is like: "import/mesh/{meshId}/{fileName}.obj"
+        // We need: projectPath + "/" + "import/mesh/{meshId}/"
+        const meshPathParts = meshData.path.split(/[\\/]/);
+        meshPathParts.pop(); // Remove filename
+        const meshDirPath = meshPathParts.join("/");
+
+        // Use pathJoin to properly combine paths (Windows backslash format)
+        const fullMeshDirPath = window.electronAPI.pathJoin(
+          projectPath,
+          meshDirPath
+        );
+
+        // Convert Windows path to forward slashes for Three.js loaders
+        // Windows paths like "D:\path" should become "D:/path"
+        let meshPath = fullMeshDirPath.replace(/\\/g, "/");
+
+        // Remove leading slash if it exists (Windows paths shouldn't start with /)
+        // E.g., "/D:/path" -> "D:/path"
+        if (meshPath.match(/^\/[A-Z]:/i)) {
+          meshPath = meshPath.substring(1);
+        }
+
+        // Ensure path ends with forward slash
+        if (!meshPath.endsWith("/")) {
+          meshPath = meshPath + "/";
+        }
+
+        const result = await new Promise((resolve) => {
+          const manager = new window.THREE.LoadingManager();
+          manager.onProgress = function (
+            url: any,
+            itemsLoaded: any,
+            itemsTotal: any
+          ) {
+            const percentComplete = (itemsLoaded / itemsTotal) * 100;
+            requestAnimationFrame(() => {
+              if (percentComplete >= 100) {
+                // Loading complete - could show loading indicator here
+                return;
+              }
+              // Could show progress here
+            });
+          };
+
+          manager.addHandler(
+            /\.(png|jpg|bmp|jpeg)$/i,
+            new window.THREE.TextureLoader()
+          );
+
+          const mtlFileName = meshData.asset.split(/[\\/]/).pop() || "";
+          const objFileName = meshData.path.split(/[\\/]/).pop() || "";
+
+          // Log path for debugging
+          console.log("Mesh path for loaders:", meshPath);
+
+          const mtlLoader = new window.THREE.MTLLoader(manager);
+          mtlLoader.setPath(meshPath);
+          if (mtlLoader.setResourcePath) {
+            mtlLoader.setResourcePath(meshPath);
+          }
+          mtlLoader.load(
+            mtlFileName,
+            function (materials: any) {
+              //materials.preload(); // Dronet'te yorum satırında
+              new window.THREE.OBJLoader(manager)
+                .setMaterials(materials)
+                .setPath(meshPath)
+                .load(
+                  objFileName,
+                  function (object: any) {
+                    object.translateX(meshData.center.x);
+                    object.translateY(meshData.center.y);
+                    object.modelType = meshData.fileType;
+                    object.name = id;
+
+                    console.log("Mesh object loaded:", {
+                      name: object.name,
+                      childrenCount: object.children.length,
+                      hasFirstChild: !!object.children[0],
+                      firstChildType: object.children[0]?.type,
+                      firstChildMaterial: object.children[0]?.material,
+                    });
+
+                    if (!object.children || object.children.length === 0) {
+                      console.error("Mesh object has no children!");
+                      resolve(false);
+                      return;
+                    }
+
+                    if (!object.children[0]) {
+                      console.error("Mesh object's first child is undefined!");
+                      resolve(false);
+                      return;
+                    }
+
+                    if (Array.isArray(object.children[0].material)) {
+                      for (
+                        let i = 0;
+                        i < object.children[0].material.length;
+                        i++
+                      ) {
+                        const oldMat = object.children[0].material[i];
+                        // Always create new MeshBasicMaterial (Dronet style)
+                        // Material'ler MaterialCreator'dan geliyor, direkt değiştiriyoruz
+                        object.children[0].material[i] =
+                          new window.THREE.MeshBasicMaterial({
+                            color:
+                              oldMat && oldMat.color ? oldMat.color : 0xffffff,
+                            map: oldMat && oldMat.map ? oldMat.map : null,
+                            side: window.THREE.DoubleSide,
+                            transparent: oldMat && oldMat.map ? true : false,
+                          });
+                        object.children[0].material.name = id;
+                        object.children[0].name = id; 
+                      }
+                    } else {
+                      const oldMat = object.children[0].material;
+                      // Always create new MeshBasicMaterial (Dronet style)
+                      object.children[0].material =
+                        new window.THREE.MeshBasicMaterial({
+                          color:
+                            oldMat && oldMat.color ? oldMat.color : 0xffffff,
+                          map: oldMat && oldMat.map ? oldMat.map : null,
+                          wireframe: wireframe,
+                          side: window.THREE.DoubleSide,
+                          transparent: oldMat && oldMat.map ? true : false,
+                        });
+                      object.children[0].name = id;
+                    }
+
+                    object.traverse((child: any) => {
+                      if (child.isMesh) {
+                        // Ensure material is set for all mesh children
+                        if (
+                          !child.material ||
+                          (Array.isArray(child.material) &&
+                            child.material.length === 0)
+                        ) {
+                          child.material = new window.THREE.MeshBasicMaterial({
+                            color: 0xffffff,
+                            side: window.THREE.DoubleSide,
+                          });
+                        } else if (Array.isArray(child.material)) {
+                          // Ensure all materials in array are valid
+                          for (let i = 0; i < child.material.length; i++) {
+                            if (
+                              !child.material[i] ||
+                              !child.material[i].isMaterial
+                            ) {
+                              child.material[i] =
+                                new window.THREE.MeshBasicMaterial({
+                                  color: 0xffffff,
+                                  side: window.THREE.DoubleSide,
+                                });
+                            }
+                          }
+                        } else if (!child.material.isMaterial) {
+                          // Material exists but not valid, replace it
+                          child.material = new window.THREE.MeshBasicMaterial({
+                            color: 0xffffff,
+                            side: window.THREE.DoubleSide,
+                          });
+                        }
+
+                        child.geometry.boundsTree = new MeshBVH(
+                          child.geometry,
+                          {
+                            strategy: CENTER,
+                            maxLeafTris: 10,
+                            maxDepth: 25,
+                          }
+                        );
+                        child.geometry.attributes.position.updateRange = {
+                          offset: 0,
+                          count: -1,
+                        };
+                        child.geometry.computeVertexNormals();
+                        child.name = id;
+                      }
+                    });
+
+                    window.viewer.scene.scene.add(object);
+
+                    // Mesh eklendikten sonra kontrolleri tekrar ayarla (point cloud gibi)
+                    window.viewer.setControls(window.viewer.earthControls);
+
+                    setTimeout(function () {
+                      PotreeService.focusToMesh(id);
+                      lookingModel.current = "mesh-model";
+                    }, 500);
+                  },
+                  undefined,
+                  function () {
+                    resolve(false);
+                  }
+                );
+            },
+            // eslint-disable-next-line @typescript-eslint/no-empty-function
+            function () {},
+            function () {
+              resolve(false);
+            }
+          );
+
+          resolve(true);
+        });
+
+        return result;
+      } catch (error) {
+        console.error(error);
+        return null;
+      }
+    },
+    [project]
+  );
+
+  // Load meshes automatically when mesh metadata changes
+  useEffect(() => {
+    if (!isPotreeReady || !window.viewer) {
+      return;
+    }
+
+    const loadMeshes = async () => {
+      const meshes = project?.metadata?.mesh || [];
+      if (meshes.length === 0) {
+        return;
+      }
+
+      for (const mesh of meshes) {
+        // Check if mesh is already loaded in scene
+        const objects = window.viewer.scene.scene.children;
+        const meshExists = objects.some(
+          (obj: any) => obj.name === mesh.id && obj.modelType === "mesh"
+        );
+
+        if (!meshExists) {
+          // Mesh not loaded yet, load it
+          await loadMesh(mesh.id);
+        }
+      }
+    };
+
+    loadMeshes();
+  }, [project?.metadata?.mesh, isPotreeReady, loadMesh]);
+
+  const potreeOnMouseMove = async (event: React.MouseEvent<HTMLDivElement>) => {
+    if (lookingModel.current == "point-cloud") {
+      const { clientX, clientY } = event;
+      const now = Date.now();
+
+      // 1. MİKTAR KONTROLÜ (Distance Threshold):
+      // Fare 5 pikselden az hareket ettiyse ağır hesaplamaya HİÇ girme.
+      const dist = Math.sqrt(
+        Math.pow(clientX - lastX.current, 2) +
+          Math.pow(clientY - lastY.current, 2)
+      );
+      if (dist < 3) return;
+
+      // 2. ZAMAN KONTROLÜ (Throttle):
+      // Saniyede maksimum 20-25 kez çalışmasına izin ver (40-50ms).
+      if (now - lastCallTime.current < 65) return;
+
+      // Durum kontrolleri
+      if (isMouseWheelHeld || isObjectMoving) return;
+      const pointCloudsArray = window.viewer?.scene?.pointclouds;
+      if (!pointCloudsArray || pointCloudsArray.length === 0) return;
+
+      // Değerleri güncelle
+      lastX.current = clientX;
+      lastY.current = clientY;
+      lastCallTime.current = now;
+
+      // 3. ASIL HESAPLAMA (Ağır İşlem)
+      try {
+        const resultPc = await PointCloudService.mouseCoordListener(
+          event.nativeEvent,
+          pointCloudsArray
+        );
+
+        if (
+          resultPc?.point?.position &&
+          resultPc.point.position.x !== -1 &&
+          project
+        ) {
+          const pos = resultPc.point.position;
+          const pointCloud = project.metadata.pointCloud.find(
+            (pc) => pc.id == resultPc.pointCloudId
+          );
+          if (pointCloud && intersectedPointCloud.current != pointCloud.id) {
+            intersectedPointCloud.current = pointCloud.id;
+            StatusBarActions.setModelData(
+              pointCloud?.id,
+              pointCloud?.name,
+              pointCloud?.epsg
+            );
+          }
+          StatusBarActions.setCoordinates(
+            Number(pos.x.toFixed(3)),
+            Number(pos.y.toFixed(3)),
+            Number(pos.z.toFixed(3))
+          );
+        } else {
+          StatusBarActions.clearCoords();
+        }
+      } catch (e) {
+        // Hata durumunda sessizce fail ol (FPS'i korumak için)
+      }
+    } else if (lookingModel.current == "mesh-model" && project) {
+      const { clientX, clientY } = event;
+      const now = Date.now();
+
+      // 1. MİKTAR KONTROLÜ (Distance Threshold):
+      // Fare 5 pikselden az hareket ettiyse ağır hesaplamaya HİÇ girme.
+      const dist = Math.sqrt(
+        Math.pow(clientX - lastX.current, 2) +
+          Math.pow(clientY - lastY.current, 2)
+      );
+      if (dist < 3) return;
+
+      // 2. ZAMAN KONTROLÜ (Throttle):
+      // Saniyede maksimum 20-25 kez çalışmasına izin ver (40-50ms).
+      if (now - lastCallTime.current < 65) return;
+
+      // Durum kontrolleri
+      if (isMouseWheelHeld || isObjectMoving) return;
+
+      // Değerleri güncelle
+      lastX.current = clientX;
+      lastY.current = clientY;
+      lastCallTime.current = now;
+
+      // 3. ASIL HESAPLAMA (Ağır İşlem) - Point cloud gibi throttle ile
+      try {
+        const resultMesh = await MeshService.mouseCoordListener(
+          event.nativeEvent
+        );
+
+        if (
+          resultMesh?.point?.position &&
+          resultMesh.point.position.x !== -1
+        ) {
+          // console.error(resultMesh);
+          const meshModel = project.metadata.mesh.find(
+            (mesh) => mesh.id == resultMesh.id
+        );
+
+        // console.error(meshModel)
+
+        if (meshModel && intersectedMeshModel.current != meshModel.id) {
+            intersectedPointCloud.current = meshModel.id;
+            console.error(meshModel)
+            StatusBarActions.setModelData(
+              meshModel?.id,
+              meshModel?.name,
+              meshModel?.epsg
+            );
+          }
+
+          StatusBarActions.setCoordinates(
+            Number(resultMesh.point.position.x.toFixed(2)),
+            Number(resultMesh.point.position.y.toFixed(2)),
+            Number(resultMesh.point.position.z.toFixed(2))
+          );
+        } else {
+          StatusBarActions.clearCoords();
+        }
+      } catch (e) {
+        // Hata durumunda sessizce fail ol (FPS'i korumak için)
+      }
     }
   };
 

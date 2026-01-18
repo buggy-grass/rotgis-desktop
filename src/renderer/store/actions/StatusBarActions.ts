@@ -13,9 +13,9 @@ class StatusBarActions {
     });
   }
 
-  static setPointCloudData(id: string, name: string, epsg: string) {
+  static setModelData(id: string, name: string, epsg: string) {
     store.dispatch({
-      type: "STATUS_BAR/SET_POINTCLOUD_DATA",
+      type: "STATUS_BAR/SET_MODEL_DATA",
       payload: { id, epsg, name },
     });
   }

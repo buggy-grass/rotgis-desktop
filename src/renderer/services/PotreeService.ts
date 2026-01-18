@@ -5,7 +5,7 @@ import ProjectActions from "../store/actions/ProjectActions";
 import ProjectService from "./ProjectService";
 import { MeasurementLayer } from "../types/ProjectTypes";
 
-interface Coordinate extends Array<number> { }
+interface Coordinate extends Array<number> {}
 
 export interface BoundaryJSON {
   type: "MultiPolygon";
@@ -218,30 +218,37 @@ class PotreeService {
           sceneNode = undefined;
           parent.children[childIndex] = geometryNode;
 
-          const pcFolderPath = await PathService.directoryPath(pc.pcoGeometry.loader.url);
+          const pcFolderPath = await PathService.directoryPath(
+            pc.pcoGeometry.loader.url
+          );
           const exist = await DirectoryService.exist(pcFolderPath);
-          if(exist){
+          if (exist) {
             await DirectoryService.delete(pcFolderPath);
-            const existPointCloud = ProjectActions.getProjectState().project?.metadata.pointCloud.find((pointCloud) => pointCloud.id == pc.name);
-            if(existPointCloud && existPointCloud.layers){
-              existPointCloud?.layers.forEach(element => {
-               if(element.type == "measurement"){
-                PotreeService.removeMeasurement(element.id);
-               }
+            const existPointCloud =
+              ProjectActions.getProjectState().project?.metadata.pointCloud.find(
+                (pointCloud) => pointCloud.id == pc.name
+              );
+            if (existPointCloud && existPointCloud.layers) {
+              existPointCloud?.layers.forEach((element) => {
+                if (element.type == "measurement") {
+                  PotreeService.removeMeasurement(element.id);
+                }
               });
             }
-            ProjectActions.deletePointCloud(pc.id)
+            ProjectActions.deletePointCloud(pc.id);
           }
         }
       }
     }
   }
 
-  static async removeMeasurement(id: string){
+  static async removeMeasurement(id: string) {
     try {
-      if(window.viewer){
-        const existMeasurement = window.viewer.scene.measurements.find((measure: any) => measure.uuid == id);
-        if(existMeasurement){
+      if (window.viewer) {
+        const existMeasurement = window.viewer.scene.measurements.find(
+          (measure: any) => measure.uuid == id
+        );
+        if (existMeasurement) {
           window.viewer.scene.removeMeasurement(existMeasurement);
         }
       }
@@ -494,7 +501,13 @@ class PotreeService {
     }
   }
 
-  static setMouseConfigurations(zoomButton?: number, rotateButton?: number, dragButton?: number, zoomSpeed?: number, rotationSpeed?: number) {
+  static setMouseConfigurations(
+    zoomButton?: number,
+    rotateButton?: number,
+    dragButton?: number,
+    zoomSpeed?: number,
+    rotationSpeed?: number
+  ) {
     if (window.viewer) {
       // Eğer değer undefined ise, viewer'daki değeri de undefined yap (veya 0)
       // ?? operatörü yerine explicit undefined kontrolü yapıyoruz
@@ -503,19 +516,19 @@ class PotreeService {
       } else {
         window.viewer.zoomButton = undefined;
       }
-      
+
       if (rotateButton !== undefined) {
         window.viewer.rotateButton = rotateButton;
       } else {
         window.viewer.rotateButton = undefined;
       }
-      
+
       if (dragButton !== undefined) {
         window.viewer.dragButton = dragButton;
       } else {
         window.viewer.dragButton = undefined;
       }
-      
+
       if (window.viewer.earthControls) {
         if (zoomSpeed !== undefined) {
           window.viewer.earthControls.fadeFactor = zoomSpeed;
@@ -694,7 +707,7 @@ class PotreeService {
         window.viewer.zoomTo(pointCloud, 1.0, 500);
         (window as any).activePointCloudId = pointCloudId;
       } catch (fallbackError) {
-        console.error(fallbackError)
+        console.error(fallbackError);
       }
     }
   }
@@ -703,7 +716,10 @@ class PotreeService {
    * Focus to a measurement by its extent (bounding box)
    * @param extent The bounding box of the measurement
    */
-  static focusToMeasure(extent: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }) {
+  static focusToMeasure(extent: {
+    min: { x: number; y: number; z: number };
+    max: { x: number; y: number; z: number };
+  }) {
     if (!window.viewer) {
       return;
     }
@@ -718,6 +734,76 @@ class PotreeService {
       window.viewer.zoomTo(node, 1.0, 500);
     } catch (error) {
       console.error("Error focusing to measurement:", error);
+    }
+  }
+
+  /**
+   * Focus to a specific mesh by its ID
+   * @param meshId The ID of the mesh to focus on
+   */
+  static focusToMesh(meshId: string) {
+    if (!window.viewer) {
+      return;
+    }
+
+    try {
+      let box;
+      let max_x = -Infinity;
+      let max_y = -Infinity;
+      let max_z = -Infinity;
+      let min_x = Infinity;
+      let min_y = Infinity;
+      let min_z = Infinity;
+      const objects = window.viewer.scene.scene.children;
+      let meshFound = false;
+      
+      for (let i = 0; i < objects.length; i++) {
+        if (objects[i].name == meshId && objects[i].modelType == "mesh") {
+          meshFound = true;
+          if (objects[i].children.length == 0) {
+            box = PotreeService.getVectorBbox(objects[i]);
+          } else {
+            box = PotreeService.getVectorBbox(objects[i].children[0]);
+          }
+          if (box.max.x > max_x) {
+            max_x = box.max.x;
+          }
+          if (box.max.y > max_y) {
+            max_y = box.max.y;
+          }
+          if (box.max.z > max_z) {
+            max_z = box.max.z;
+          }
+
+          if (box.min.x < min_x) {
+            min_x = box.min.x;
+          }
+          if (box.min.y < min_y) {
+            min_y = box.min.y;
+          }
+          if (box.min.z < min_z) {
+            min_z = box.min.z;
+          }
+        }
+      }
+      
+      if (meshFound && max_x !== -Infinity && min_x !== Infinity) {
+        const threebbox = new window.THREE.Box3();
+        threebbox.max.x = max_x;
+        threebbox.max.y = max_y;
+        threebbox.max.z = max_z;
+        threebbox.min.x = min_x;
+        threebbox.min.y = min_y;
+        threebbox.min.z = min_z;
+
+        const node = new window.THREE.Object3D();
+        node.boundingBox = threebbox;
+        window.viewer.zoomTo(node, 1, 500);
+      } else {
+        console.warn(`Mesh ${meshId} not found or bounding box is invalid`);
+      }
+    } catch (error) {
+      console.error("Error focusing to mesh:", error);
     }
   }
 
@@ -743,17 +829,26 @@ class PotreeService {
     color: number[];
   } {
     // Extract points - handle both position.toArray() and position object
-    const points: number[][] = measurement.points.map((p: any) => p.position.toArray())
+    const points: number[][] = measurement.points.map((p: any) =>
+      p.position.toArray()
+    );
 
     // Extract color - handle both color.toArray() and color object
     let color: number[] = [1, 1, 0]; // Default yellow
     if (measurement.color) {
-      if (measurement.color.toArray && typeof measurement.color.toArray === "function") {
+      if (
+        measurement.color.toArray &&
+        typeof measurement.color.toArray === "function"
+      ) {
         color = measurement.color.toArray();
       } else if (Array.isArray(measurement.color)) {
         color = measurement.color;
       } else if (measurement.color.r !== undefined) {
-        color = [measurement.color.r, measurement.color.g || 0, measurement.color.b || 0];
+        color = [
+          measurement.color.r,
+          measurement.color.g || 0,
+          measurement.color.b || 0,
+        ];
       }
     }
 
@@ -797,19 +892,27 @@ class PotreeService {
       }
 
       const pointClouds = currentState.project.metadata.pointCloud || [];
-      const pointCloudIndex = pointClouds.findIndex((pc) => pc.id === pointCloudId);
-      
+      const pointCloudIndex = pointClouds.findIndex(
+        (pc) => pc.id === pointCloudId
+      );
+
       if (pointCloudIndex === -1) {
-        console.error(`Cannot update measurement color: Point cloud with ID ${pointCloudId} not found`);
+        console.error(
+          `Cannot update measurement color: Point cloud with ID ${pointCloudId} not found`
+        );
         return;
       }
 
       const pointCloud = pointClouds[pointCloudIndex];
       const layers = pointCloud.layers || [];
-      const layerIndex = layers.findIndex((l) => l.id === measurementId && l.type === "measurement");
-      
+      const layerIndex = layers.findIndex(
+        (l) => l.id === measurementId && l.type === "measurement"
+      );
+
       if (layerIndex === -1) {
-        console.error(`Cannot update measurement color: Measurement layer with ID ${measurementId} not found`);
+        console.error(
+          `Cannot update measurement color: Measurement layer with ID ${measurementId} not found`
+        );
         return;
       }
 
@@ -820,7 +923,10 @@ class PotreeService {
       };
 
       // Update Redux
-      ProjectActions.updateMeasurementLayer(pointCloudId, updatedMeasurementLayer);
+      ProjectActions.updateMeasurementLayer(
+        pointCloudId,
+        updatedMeasurementLayer
+      );
 
       // 2. Update Potree viewer
       if (window.viewer && window.viewer.scene) {
@@ -828,14 +934,17 @@ class PotreeService {
           (m: any) => m.uuid === measurementId
         );
         if (measurement) {
-          measurement.color = new window.THREE.Color(color[0], color[1], color[2]);
+          measurement.color = new window.THREE.Color(
+            color[0],
+            color[1],
+            color[2]
+          );
         }
       }
 
       // 3. Save to file (auto-save will handle this via Redux store subscription)
       // The ProjectAutoSave service is already set up to save when Redux changes
       // So we don't need to explicitly save here
-
     } catch (error) {
       console.error("Error updating measurement color:", error);
       throw error;

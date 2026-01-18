@@ -39,6 +39,7 @@ import FolderStructure from "./FolderStructure";
 import LayerBox, { LayersRef } from "./LayerBox";
 import AddLayerDialog from "../dialogs/AddLayerDialog";
 import PointCloudService from "../../services/PointCloudService";
+import MeshService from "../../services/MeshService";
 
 const useStyles = makeUseStyles({
   container: {
@@ -118,14 +119,14 @@ function Toolbox() {
         await PointCloudService.import(filePath);
         break;
         case "mesh":
-        
+        await MeshService.import(filePath);
         break;
         case "vector":
         
         break;
      } 
     } catch (error) {
-      
+      console.error("Error importing layer:", error);
     }
   };
 

@@ -1,5 +1,5 @@
 export default interface IStatusBar {
-  pointCloudData: {
+  modelData: {
     id: string;
     name: string,
     epsg: string

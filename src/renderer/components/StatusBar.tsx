@@ -48,7 +48,8 @@ CoordinateDisplay.displayName = "CoordinateDisplay";
 PointCloudDisplay.displayName = "PointCloudDisplay";
 
 const StatusBar = memo(function StatusBar() {
-  const pointCloudData = useSelector((state: RootState) => state.statusBarReducer.pointCloudData);
+  const pointCloudData = useSelector((state: RootState) => state.statusBarReducer.modelData);
+  console.error(pointCloudData)
   const coordinates = useSelector((state: RootState) => state.statusBarReducer.coordinates);
   const operation = useSelector((state: RootState) => state.statusBarReducer.operation);
 

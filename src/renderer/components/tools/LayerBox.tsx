@@ -410,6 +410,8 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         // If it's a point cloud, focus to it
         if (layer.type === "point-cloud" && layer.data) {
           PotreeService.focusToPointCloud(layer.id);
+        } else if (layer.type === "mesh" && layer.data) {
+          PotreeService.focusToMesh(layer.id);
         }
       };
 
@@ -508,8 +510,8 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                                 <EyeOff className="h-3 w-3 text-muted-foreground" />
                               )}
                             </div>
-                            {/* Show focus button for point clouds even if they have children */}
-                            {layer.type === "point-cloud" && (
+                            {/* Show focus button for point clouds and meshes even if they have children */}
+                            {(layer.type === "point-cloud" || layer.type === "mesh") && (
                               <div
                                 className="h-7 w-7 p-1.5 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer"
                                 onClick={(e) => {
@@ -563,6 +565,8 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         // If it's a point cloud, focus to it
         if (layer.type === "point-cloud" && layer.data) {
           PotreeService.focusToPointCloud(layer.id);
+        } else if (layer.type === "mesh" && layer.data) {
+          PotreeService.focusToMesh(layer.id);
         } else if (layer.type === "measurement" && layer.data) {
           // Focus to measurement extent
           const measurementLayer = layer.data as MeasurementLayer;
@@ -726,8 +730,9 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                         />
                       )}
                     </div>
-                    {/* Show focus button for point clouds even if they have children */}
+                    {/* Show focus button for point clouds, meshes, and measurements */}
                     {(layer.type === "point-cloud" ||
+                      layer.type === "mesh" ||
                       layer.type === "measurement") && (
                       <div
                         className={`flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer ${

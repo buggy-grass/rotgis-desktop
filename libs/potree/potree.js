@@ -55382,24 +55382,21 @@
 			raycaster.setFromCamera( mouse, window.viewer.scene.getActiveCamera() );
 		  
 			let projects2=[];
-			let dronetplane = null;
+			let rotplane = null;
 			let objects= window.viewer.scene.scene.children;
 			
 			for(let i=0;i<objects.length;i++){
-			  if(objects[i].droType=="mesh" && objects[i].children.length !=0){
+			  if(objects[i].modelType=="mesh" && objects[i].children.length !=0){
 				// if(objects[i].editmode){
 					// projects2 = projects2.concat(objects[i].children);
 				// }else{
 					projects2.push(objects[i].children[0]);
 				// }
 				//projects2.push(objects[i].children[0]);
-			  }else if(objects[i].droType=="dronetplane"){
-				dronetplane = objects[i];
+			  }else if(objects[i].modelType=="rotplane"){
+				rotplane = objects[i];
 			  }
 			}
-			// if(orbitcontrol){
-			// 	projects2.push(dronetplane);
-			// }
 			
 			let intersects = raycaster.intersectObjects(projects2, false);
 
@@ -65247,7 +65244,7 @@ void main() {
 			cadLayers: cadLayers,
 			cadLayers2d: cadLayers2d,
 			volumeLayers: []
-			//volumeLayers: scene.scene.children.filter((layer) => layer.droType === "volume").map(createVolumeLayerData),
+			//volumeLayers: scene.scene.children.filter((layer) => layer.modelType === "volume").map(createVolumeLayerData),
 			// objects: createSceneContentData(viewer),
 		};
 
@@ -68197,12 +68194,12 @@ void main() {
 	class LayerObjectCreator{
 		constructor(){}
 
-		async create(layerid,layername,color,width, visible, droType = "cadLayer"){
+		async create(layerid,layername,color,width, visible, modelType = "cadLayer"){
 			const node = new Object3D();
 			node.layerId = layerid;
 			node.layerName = layername;
 			node.name = layername;
-			node.droType=droType;
+			node.modelType=modelType;
 			node.color=color ? color : "#ffffff";
 			node.width=width ? width : 0.5;
 			node.visible = visible ? visible: true;
@@ -79166,7 +79163,7 @@ ENDSEC
 			const orientedImages = [];
 			const sceneNode = new Object3D();
 			sceneNode.name = "oriented_images";
-			sceneNode.droType = "droImageLayer";
+			sceneNode.modelType = "rotImageLayer";
 
 			for(const params of imageParams){
 
@@ -84422,6 +84419,17 @@ ENDSEC
 						}}, true);
 					}
 
+				let activeModel = "none";
+				if(I.pointcloud){
+						activeModel = "point-cloud";
+					}
+					if(I.object){
+						activeModel = "mesh-model";
+					}
+					window.eventBus.emit("setLookingModel", {
+						type: activeModel
+					});
+
 				if (I) {
 					this.pivot = I.location;
 					this.camStart = this.scene.getActiveCamera().clone();
@@ -84561,12 +84569,14 @@ ENDSEC
 					}
 				// Dronet
 				if(I==null){
-				I = Utils.meshIntersection({drag:{
-					end: {
-						x: this.viewer.inputHandler.mouse.x,
-						y: this.viewer.inputHandler.mouse.y
+					I = Utils.meshIntersection({
+					drag:{
+						end: {
+							x: this.viewer.inputHandler.mouse.x,
+							y: this.viewer.inputHandler.mouse.y
+							}
 						}
-					}}, true);
+					}, true);
 				}
 
 				if (I) {
@@ -84585,6 +84595,17 @@ ENDSEC
 						let speed = view.radius / 2.5;
 						this.viewer.setMoveSpeed(speed);
 					}
+
+					let activeModel = "none";
+					if(I.pointcloud){
+						activeModel = "point-cloud";
+					}
+					if(I.object){
+						activeModel = "mesh-model";
+					}
+					window.eventBus.emit("setLookingModel", {
+						type: activeModel
+					});
 				}
 			}
 

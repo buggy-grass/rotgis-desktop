@@ -210,14 +210,39 @@ function parseMesh(element: Element) {
   if (!element) {
     throw new Error("parseMesh: element is null");
   }
+  
+  // Parse center - XML has two separate <center> tags (same as pointCloud)
+  const centerElements = element.querySelectorAll("center");
+  let center = { x: 0, y: 0 };
+  if (centerElements.length >= 2) {
+    center = {
+      x: getNumberContent(centerElements[0]),
+      y: getNumberContent(centerElements[1]),
+    };
+  } else if (centerElements.length === 1) {
+    // Fallback: try to parse as single element
+    center = parseCenter(centerElements[0]);
+  }
+  
+  // Parse bbox before using it for center calculation
+  const bbox = parseBBox(element.querySelector("bbox"));
+  
+  // If center is 0,0, calculate from bbox (same logic as pointCloud)
+  if (center.x === 0 && center.y === 0 && bbox.min.x !== 0 && bbox.max.x !== 0) {
+    center = {
+      x: (bbox.min.x + bbox.max.x) / 2,
+      y: (bbox.min.y + bbox.max.y) / 2,
+    };
+  }
+  
   return {
     id: getTextContent(element.querySelector("id")),
     name: getTextContent(element.querySelector("name")),
     fileType: "mesh" as const,
     extension: getTextContent(element.querySelector("extension")),
     asset: getTextContent(element.querySelector("asset")),
-    bbox: parseBBox(element.querySelector("bbox")),
-    center: parseCenter(element.querySelector("center")),
+    bbox: bbox,
+    center: center,
     epsg: getTextContent(element.querySelector("epsg")),
     epsgText: getTextContent(element.querySelector("epsgText")),
     proj4: getTextContent(element.querySelector("proj4")),

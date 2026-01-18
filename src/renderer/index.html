@@ -128,6 +128,23 @@
         console.log('Loading ThreeJS...');
         return loadScript(threejsPath);
       })
+      // 4.5. Loaders (Three.js'den sonra, Potree'den önce)
+      .then(() => {
+        console.log('Loading Three.js Loaders...');
+        return Promise.all([
+          loadScript(mtlLoaderPath),
+          loadScript(objLoaderPath)
+        ]).then(() => {
+          // Ensure loaders are available in window.THREE if they're not already
+          // Some loader files might export directly to window.THREE
+          if (window.THREE && typeof window.THREE.MTLLoader === 'undefined') {
+            console.warn('MTLLoader not found in window.THREE, attempting to register...');
+          }
+          if (window.THREE && typeof window.THREE.OBJLoader === 'undefined') {
+            console.warn('OBJLoader not found in window.THREE, attempting to register...');
+          }
+        });
+      })
       // 5. Potree (tüm bağımlılıklardan sonra)
       .then(() => {
         console.log('Loading Potree...');

@@ -171,12 +171,12 @@ export async function openProject(): Promise<void> {
     // Load and validate project
     const { project, projectFilePath, projectFolderPath } = await loadProjectFromFile(selectedFilePath);
 
+    console.error(project);
     // Update store
     ProjectActions.setProject(project);
     ProjectActions.setProjectPaths(projectFilePath, projectFolderPath);
     ProjectActions.setDirty(false);
 
-    console.log("Project loaded successfully:", projectFilePath);
   } catch (error) {
     console.error("Error opening project:", error);
     throw error;
