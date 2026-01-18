@@ -71,6 +71,9 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
     useState<PointCloud | null>(null);
   const [fileSize, setFileSize] = useState<number | null>(null);
   const [contextMenuOpen, setContextMenuOpen] = useState<string | null>(null);
+  const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null);
+  const [colorPickerPosition, setColorPickerPosition] = useState<{ x: number; y: number } | null>(null);
+  const colorPickerRef = useRef<HTMLDivElement>(null);
 
   // Filter valid point clouds (with existing assets)
   const [validPointClouds, setValidPointClouds] = useState<PointCloud[]>([]);
@@ -266,6 +269,27 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
       hasExpandedOnceRef.current = false;
     }
   }, [project?.project?.id, layers, validPointClouds.length]);
+
+  // Close color picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (colorPickerOpen && colorPickerRef.current) {
+        const target = event.target as Node;
+        if (!colorPickerRef.current.contains(target)) {
+          setColorPickerOpen(null);
+          setColorPickerPosition(null);
+        }
+      }
+    };
+
+    if (colorPickerOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [colorPickerOpen]);
 
   const toggleVisibility = (
     layerId: string,
@@ -504,7 +528,8 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                   </div>
                 </AccordionTrigger>
               </ContextMenuTrigger>
-              {(layer.type === "point-cloud") && (
+              {/* Context menu only for point-cloud layers, not for parent layers */}
+              {layer.type === "point-cloud" && layer.id !== "point-cloud-parent" && layer.id !== "mesh-parent" && layer.id !== "vector-parent" && (
                 <ContextMenuContent>
                   <ContextMenuItem
                     onClick={handleShowProperties}
@@ -726,21 +751,47 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                         />
                       </div>
                     )}
+                    {/* Color button for measurement layers */}
+                    {layer.type === "measurement" && layer.data && (
+                      <div
+                        className="h-5 w-5 p-0.5 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer border border-border"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          const measurementLayer = layer.data as MeasurementLayer;
+                          const currentColor = measurementLayer.color || [1, 1, 0]; // Default yellow
+                          // Get button position for popup
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          setColorPickerPosition({ x: rect.left, y: rect.bottom + 4 });
+                          setColorPickerOpen(layer.id);
+                        }}
+                        onContextMenu={(e) => e.stopPropagation()}
+                        title="Change measurement color"
+                      >
+                        <div
+                          className="w-full h-full rounded-sm"
+                          style={{
+                            backgroundColor: layer.data && (layer.data as MeasurementLayer).color
+                              ? `rgb(${Math.round((layer.data as MeasurementLayer).color![0] * 255)}, ${Math.round((layer.data as MeasurementLayer).color![1] * 255)}, ${Math.round((layer.data as MeasurementLayer).color![2] * 255)})`
+                              : "rgb(255, 255, 0)", // Default yellow
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
             </div>
           </ContextMenuTrigger>
-          {(layer.type === "point-cloud" || layer.type === "measurement") && (
+          {/* Context menu only for point-cloud layers, not for measurement or parent layers */}
+          {layer.type === "point-cloud" && (
             <ContextMenuContent>
-              {layer.type === "point-cloud" && (
-                <ContextMenuItem
-                  onClick={handleShowProperties}
-                  className="text-xs"
-                >
-                  <Info className="mr-2 h-3 w-3" />
-                  Properties
-                </ContextMenuItem>
-              )}
+              <ContextMenuItem
+                onClick={handleShowProperties}
+                className="text-xs"
+              >
+                <Info className="mr-2 h-3 w-3" />
+                Properties
+              </ContextMenuItem>
               <ContextMenuItem
                 onClick={handleDelete}
                 className="text-xs text-destructive focus:text-destructive"
@@ -1036,6 +1087,64 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Color Picker Popup */}
+      {colorPickerOpen && colorPickerPosition && (
+        <div
+          ref={colorPickerRef}
+          className="fixed bg-popover border border-border rounded-md shadow-lg p-3 z-[9999]"
+          style={{
+            left: `${colorPickerPosition.x}px`,
+            top: `${colorPickerPosition.y}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="text-xs font-semibold mb-2">Select Color</div>
+          <div className="grid grid-cols-9 gap-1">
+            {/* Common colors palette */}
+            {[
+              { r: 1, g: 1, b: 0 }, // Yellow
+              { r: 1, g: 0, b: 0 }, // Red
+              { r: 0, g: 1, b: 0 }, // Green
+              { r: 0, g: 0, b: 1 }, // Blue
+              { r: 1, g: 0.5, b: 0 }, // Orange
+              { r: 1, g: 0, b: 1 }, // Magenta
+              { r: 0, g: 1, b: 1 }, // Cyan
+              { r: 1, g: 1, b: 1 }, // White
+              { r: 0, g: 0, b: 0 }, // Black
+            ].map((color, index) => (
+              <button
+                key={index}
+                className="w-6 h-6 rounded-sm border border-border hover:scale-110 transition-transform cursor-pointer"
+                style={{
+                  backgroundColor: `rgb(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)})`,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  if (colorPickerOpen && project) {
+                    const currentState = ProjectActions.getProjectState();
+                    const allPointClouds = currentState.project?.metadata.pointCloud || [];
+                    
+                    // Find the measurement layer
+                    for (const pc of allPointClouds) {
+                      const measurementLayer = pc.layers?.find((l) => l.id === colorPickerOpen && l.type === "measurement");
+                      if (measurementLayer) {
+                        const newColor = [color.r, color.g, color.b] as [number, number, number];
+                        PotreeService.updateMeasurementColor(pc.id, colorPickerOpen, newColor);
+                        break;
+                      }
+                    }
+                  }
+                  setColorPickerOpen(null);
+                  setColorPickerPosition(null);
+                }}
+              />
+            ))}
           </div>
         </div>
       )}

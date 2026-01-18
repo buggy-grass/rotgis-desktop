@@ -2,6 +2,8 @@ import path from "path";
 import PathService from "./PathService";
 import DirectoryService from "./DirectoryService";
 import ProjectActions from "../store/actions/ProjectActions";
+import ProjectService from "./ProjectService";
+import { MeasurementLayer } from "../types/ProjectTypes";
 
 interface Coordinate extends Array<number> { }
 
@@ -773,6 +775,71 @@ class PotreeService {
     };
 
     return data;
+  }
+
+  /**
+   * Update measurement color in Redux, file, and Potree viewer
+   * @param pointCloudId The ID of the point cloud containing the measurement
+   * @param measurementId The ID of the measurement layer
+   * @param color The new color as [r, g, b] array (0-1 range)
+   */
+  static async updateMeasurementColor(
+    pointCloudId: string,
+    measurementId: string,
+    color: [number, number, number]
+  ): Promise<void> {
+    try {
+      // 1. Update Redux
+      const currentState = ProjectActions.getProjectState();
+      if (!currentState.project) {
+        console.error("Cannot update measurement color: No project loaded");
+        return;
+      }
+
+      const pointClouds = currentState.project.metadata.pointCloud || [];
+      const pointCloudIndex = pointClouds.findIndex((pc) => pc.id === pointCloudId);
+      
+      if (pointCloudIndex === -1) {
+        console.error(`Cannot update measurement color: Point cloud with ID ${pointCloudId} not found`);
+        return;
+      }
+
+      const pointCloud = pointClouds[pointCloudIndex];
+      const layers = pointCloud.layers || [];
+      const layerIndex = layers.findIndex((l) => l.id === measurementId && l.type === "measurement");
+      
+      if (layerIndex === -1) {
+        console.error(`Cannot update measurement color: Measurement layer with ID ${measurementId} not found`);
+        return;
+      }
+
+      const measurementLayer = layers[layerIndex] as MeasurementLayer;
+      const updatedMeasurementLayer: MeasurementLayer = {
+        ...measurementLayer,
+        color: color,
+      };
+
+      // Update Redux
+      ProjectActions.updateMeasurementLayer(pointCloudId, updatedMeasurementLayer);
+
+      // 2. Update Potree viewer
+      if (window.viewer && window.viewer.scene) {
+        const measurement = window.viewer.scene.measurements.find(
+          (m: any) => m.uuid === measurementId
+        );
+        if (measurement) {
+          measurement.color = new window.THREE.Color(color[0], color[1], color[2]);
+        }
+      }
+
+      // 3. Save to file (auto-save will handle this via Redux store subscription)
+      // The ProjectAutoSave service is already set up to save when Redux changes
+      // So we don't need to explicitly save here
+
+    } catch (error) {
+      console.error("Error updating measurement color:", error);
+      throw error;
+    }
   }
 }
 export default PotreeService;
