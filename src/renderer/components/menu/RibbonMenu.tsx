@@ -31,6 +31,8 @@ import {
   Tangent,
   VectorSquare,
   RulerDimensionLine,
+  NotebookPenIcon,
+  MessageSquarePlusIcon,
 } from "lucide-react";
 import { SaveProjectDialog } from '../dialogs/SaveProjectDialog';
 import ProjectService from '../../services/ProjectService';
@@ -39,6 +41,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store/store';
 import { manualSaveProject } from '../../services/ProjectAutoSave';
 import StatusBarActions from '../../store/actions/StatusBarActions';
+import AnnotationService from '../../services/AnnotationService';
 
 // Helper function to get icon name from LucideIcon component
 const getIconName = (icon: LucideIcon): string => {
@@ -487,6 +490,10 @@ function RibbonMenu() {
     }
   };
 
+  const handleAddAnnotation = () =>{
+    AnnotationService.add("ROTGIS Annonation Title", "ROTGIS CONTENT");
+  }
+
   const handleMeasurementToolClick = (toolType: string) => {
     // If the same tool is already selected, deselect it
     if (selectedMeasureTool === toolType) {
@@ -664,6 +671,36 @@ function RibbonMenu() {
         },
       ],
     },
+    {
+      value: "annotation",
+      label: "Annotation",
+      icon: NotebookPenIcon,
+      groups: [
+        {
+          title: "Add",
+          buttons: [
+            { label: "Add", icon: MessageSquarePlusIcon, variant: "default", onClick: () => handleAddAnnotation() },
+            { label: "Import", icon: FileText, variant: "ghost" },
+          ],
+        },
+        {
+          title: "Edit",
+          buttons: [
+            { label: "Transform", icon: Move, variant: "ghost" },
+            { label: "Rotate", icon: RotateCw, variant: "ghost" },
+            { label: "Scale", icon: ZoomIn, variant: "ghost" },
+          ],
+        },
+        {
+          title: "Export",
+          buttons: [
+            { label: "Save", icon: Save, variant: "ghost" },
+            { label: "Export", icon: Download, variant: "ghost" },
+            { label: "Image", icon: Image, variant: "ghost" },
+          ],
+        },
+      ],
+    }
   ];
 
   const renderRibbonContent = (tab: RibbonTab) => {

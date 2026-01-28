@@ -156,22 +156,22 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
     });
 
     // Mesh Layer - always show, even if empty
-    layersArray.push({
-      id: "mesh-parent",
-      name: "Mesh Layer",
-      visible: true, // Parent layers are always visible
-      type: "mesh",
-      children:
-        mesh && mesh.length > 0
-          ? mesh.map((m) => ({
-              id: m.id,
-              name: m.name,
-              visible: true, // Default to true for other layer types
-              type: "mesh",
-              data: m,
-            }))
-          : [],
-    });
+    // layersArray.push({
+    //   id: "mesh-parent",
+    //   name: "Mesh Layer",
+    //   visible: true, // Parent layers are always visible
+    //   type: "mesh",
+    //   children:
+    //     mesh && mesh.length > 0
+    //       ? mesh.map((m) => ({
+    //           id: m.id,
+    //           name: m.name,
+    //           visible: true, // Default to true for other layer types
+    //           type: "mesh",
+    //           data: m,
+    //         }))
+    //       : [],
+    // });
 
     // Vector Layer (Orthophoto, DSM, DTM) - always show, even if empty
     const vectorChildren: Layer[] = [];

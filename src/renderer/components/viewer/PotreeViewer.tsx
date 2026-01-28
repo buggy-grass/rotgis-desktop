@@ -1600,8 +1600,8 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       }
     };
 
-    loadMeshes();
-  }, [project?.metadata?.mesh, isPotreeReady, loadMesh]);
+    // loadMeshes();
+  }, [project?.metadata?.mesh, isPotreeReady]);
 
   const potreeOnMouseMove = async (event: React.MouseEvent<HTMLDivElement>) => {
     if (lookingModel.current == "point-cloud") {

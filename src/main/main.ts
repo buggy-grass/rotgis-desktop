@@ -135,10 +135,10 @@ function createWindow(): void {
   if (isDev) {
     // Development modunda: process.cwd() proje root'una işaret eder
     const possiblePaths = [
-      path.resolve(process.cwd(), "src", "renderer", "assets", "app", "Untitled.ico"),
-      path.resolve(__dirname, "..", "renderer", "assets", "app", "Untitled.ico"),
-      path.resolve(__dirname, "..", "..", "src", "renderer", "assets", "app", "Untitled.ico"),
-      path.join(process.cwd(), "src", "renderer", "assets", "app", "Untitled.ico"),
+      path.resolve(process.cwd(), "src", "renderer", "assets", "app", "Unt.png"),
+      path.resolve(__dirname, "..", "renderer", "assets", "app", "Unt.png"),
+      path.resolve(__dirname, "..", "..", "src", "renderer", "assets", "app", "Unt.png"),
+      path.join(process.cwd(), "src", "renderer", "assets", "app", "Unt.png"),
     ];
     
     // İlk var olan path'i kullan
@@ -152,9 +152,9 @@ function createWindow(): void {
     // Production modunda: app.asar içinde veya dışında olabilir
     const appPath = app.getAppPath().replace(/[\\/]app\.asar$/, "");
     const possiblePaths = [
-      path.resolve(appPath, "renderer", "assets", "app", "Untitled.ico"),
-      path.resolve(app.getAppPath(), "renderer", "assets", "app", "Untitled.ico"),
-      path.join(process.resourcesPath || appPath, "renderer", "assets", "app", "Untitled.ico"),
+      path.resolve(appPath, "renderer", "assets", "app", "Unt.png"),
+      path.resolve(app.getAppPath(), "renderer", "assets", "app", "Unt.png"),
+      path.join(process.resourcesPath || appPath, "renderer", "assets", "app", "Unt.png"),
     ];
     
     for (const possiblePath of possiblePaths) {
@@ -170,7 +170,7 @@ function createWindow(): void {
     console.log("Icon path:", iconPath);
     console.log("Icon exists:", fs.existsSync(iconPath));
   } else {
-    console.warn("Icon file not found! Looking for: src/renderer/assets/app/Untitled.ico");
+    console.warn("Icon file not found! Looking for: src/renderer/assets/app/Unt.png");
   }
 
   mainWindow = new BrowserWindow({
@@ -1050,9 +1050,9 @@ if (process.platform === "win32" && process.env.GPUSET !== "true" && !isDev) {
       
       if (isDev) {
         const possiblePaths = [
-          path.resolve(process.cwd(), "src", "renderer", "assets", "app", "Untitled.ico"),
-          path.resolve(__dirname, "..", "renderer", "assets", "app", "Untitled.ico"),
-          path.resolve(__dirname, "..", "..", "src", "renderer", "assets", "app", "Untitled.ico"),
+          path.resolve(process.cwd(), "src", "renderer", "assets", "app", "Unt.png"),
+          path.resolve(__dirname, "..", "renderer", "assets", "app", "Unt.png"),
+          path.resolve(__dirname, "..", "..", "src", "renderer", "assets", "app", "Unt.png"),
         ];
         
         for (const possiblePath of possiblePaths) {
@@ -1064,9 +1064,9 @@ if (process.platform === "win32" && process.env.GPUSET !== "true" && !isDev) {
       } else {
         const appPath = app.getAppPath().replace(/[\\/]app\.asar$/, "");
         const possiblePaths = [
-          path.resolve(appPath, "renderer", "assets", "app", "Untitled.ico"),
-          path.resolve(app.getAppPath(), "renderer", "assets", "app", "Untitled.ico"),
-          path.join(process.resourcesPath || appPath, "renderer", "assets", "app", "Untitled.ico"),
+          path.resolve(appPath, "renderer", "assets", "app", "Unt.png"),
+          path.resolve(app.getAppPath(), "renderer", "assets", "app", "Unt.png"),
+          path.join(process.resourcesPath || appPath, "renderer", "assets", "app", "Unt.png"),
         ];
         
         for (const possiblePath of possiblePaths) {
@@ -1091,9 +1091,9 @@ if (process.platform === "win32" && process.env.GPUSET !== "true" && !isDev) {
       
       if (isDev) {
         const possiblePaths = [
-          path.resolve(process.cwd(), "src", "renderer", "assets", "app", "Untitled.ico"),
-          path.resolve(__dirname, "..", "renderer", "assets", "app", "Untitled.ico"),
-          path.resolve(__dirname, "..", "..", "src", "renderer", "assets", "app", "Untitled.ico"),
+          path.resolve(process.cwd(), "src", "renderer", "assets", "app", "Unt.png"),
+          path.resolve(__dirname, "..", "renderer", "assets", "app", "Unt.png"),
+          path.resolve(__dirname, "..", "..", "src", "renderer", "assets", "app", "Unt.png"),
         ];
         
         for (const possiblePath of possiblePaths) {
@@ -1105,8 +1105,8 @@ if (process.platform === "win32" && process.env.GPUSET !== "true" && !isDev) {
       } else {
         const appPath = app.getAppPath().replace(/[\\/]app\.asar$/, "");
         const possiblePaths = [
-          path.resolve(appPath, "renderer", "assets", "app", "Untitled.ico"),
-          path.resolve(app.getAppPath(), "renderer", "assets", "app", "Untitled.ico"),
+          path.resolve(appPath, "renderer", "assets", "app", "Unt.png"),
+          path.resolve(app.getAppPath(), "renderer", "assets", "app", "Unt.png"),
         ];
         
         for (const possiblePath of possiblePaths) {
