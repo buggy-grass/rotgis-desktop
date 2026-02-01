@@ -71,6 +71,21 @@ export interface MeasurementLayer {
   icon?: string; // Icon path
 }
 
+export interface AnnotationLayer {
+  id: string;
+  name: string;
+  type: "annotation";
+  visible: boolean;
+  pointCloudId: string;
+  /** Başlık (annotation başlığı) */
+  title: string;
+  /** İçerik (açıklama) */
+  content: string;
+  /** Konum [x, y, z] */
+  position: [number, number, number];
+  extent: BBox; // min/max aynı nokta veya küçük bbox (tooltip için)
+}
+
 export interface PointCloud {
   id: string;
   name: string;
@@ -87,7 +102,7 @@ export interface PointCloud {
   numberOfPoints: number;
   dsm: DSM;
   visible?: boolean; // Default: true if not specified
-  layers?: MeasurementLayer[]; // Measurement layers array
+  layers?: (MeasurementLayer | AnnotationLayer)[]; // Measurement ve annotation katmanları
 }
 
 export interface Orthophoto {

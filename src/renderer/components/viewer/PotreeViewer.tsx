@@ -463,6 +463,10 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
   const project = useSelector(
     (state: RootState) => state.projectReducer.project
   );
+  // Aktif nokta bulutu (status bar'da gösterilen) - measure bu ID'ye kaydedilir
+  const pointCloudData = useSelector(
+    (state: RootState) => state.statusBarReducer.modelData
+  );
 
   // Track if this is the first load (for initial focus)
   const isFirstLoadRef = React.useRef(true);
@@ -520,113 +524,18 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         }
       }
 
-      // Find which point cloud contains the measurement based on point positions
-      // Priority: 1) Active point cloud, 2) Point cloud that contains all measurement points, 3) First visible point cloud
-      let targetPointCloudId: string | null = null;
+      // Status bar'daki aktif nokta bulutu ID'si ile eşleşen point cloud'a kaydet
+      let targetPointCloudId: string | null =
+        pointCloudData?.id && pointClouds.some((pc) => pc.id === pointCloudData.id)
+          ? pointCloudData.id
+          : null;
 
-      if (
-        measurementData.points &&
-        measurementData.points.length > 0 &&
-        hasValidPoints
-      ) {
-        // First, check if active point cloud contains the measurement
-        const activePcId =
-          activePointCloudIdRef.current ||
-          (window as any).activePointCloudId ||
-          null;
-        if (activePcId) {
-          const activePcMetadata = pointClouds.find(
-            (pc) => pc.id === activePcId
-          );
-          if (activePcMetadata) {
-            const pcBbox = activePcMetadata.bbox;
-            let allPointsInside = true;
-            for (const point of measurementData.points) {
-              if (
-                point[0] < pcBbox.min.x ||
-                point[0] > pcBbox.max.x ||
-                point[1] < pcBbox.min.y ||
-                point[1] > pcBbox.max.y ||
-                point[2] < pcBbox.min.z ||
-                point[2] > pcBbox.max.z
-              ) {
-                allPointsInside = false;
-                break;
-              }
-            }
-            if (allPointsInside) {
-              targetPointCloudId = activePcId;
-            }
-          }
-        }
-
-        // If active point cloud doesn't contain it, find the point cloud that contains all points
-        if (!targetPointCloudId) {
-          for (const pc of pointClouds) {
-            const pcBbox = pc.bbox;
-            let allPointsInside = true;
-            for (const point of measurementData.points) {
-              if (
-                point[0] < pcBbox.min.x ||
-                point[0] > pcBbox.max.x ||
-                point[1] < pcBbox.min.y ||
-                point[1] > pcBbox.max.y ||
-                point[2] < pcBbox.min.z ||
-                point[2] > pcBbox.max.z
-              ) {
-                allPointsInside = false;
-                break;
-              }
-            }
-            if (allPointsInside) {
-              targetPointCloudId = pc.id;
-              break;
-            }
-          }
-        }
-
-        // If no point cloud contains all points, find the one that contains the most points
-        if (!targetPointCloudId) {
-          let maxPointsInside = 0;
-          for (const pc of pointClouds) {
-            const pcBbox = pc.bbox;
-            let pointsInside = 0;
-            for (const point of measurementData.points) {
-              if (
-                point[0] >= pcBbox.min.x &&
-                point[0] <= pcBbox.max.x &&
-                point[1] >= pcBbox.min.y &&
-                point[1] <= pcBbox.max.y &&
-                point[2] >= pcBbox.min.z &&
-                point[2] <= pcBbox.max.z
-              ) {
-                pointsInside++;
-              }
-            }
-            if (pointsInside > maxPointsInside) {
-              maxPointsInside = pointsInside;
-              targetPointCloudId = pc.id;
-            }
-          }
-        }
-      }
-
-      // Last fallback: use active point cloud or first visible point cloud
+      // Fallback: aktif point cloud veya ilk görünür
       if (!targetPointCloudId) {
         targetPointCloudId =
           activePointCloudIdRef.current ||
           (window as any).activePointCloudId ||
           null;
-        if (!targetPointCloudId) {
-          const loadedPointClouds = window.viewer.scene.pointclouds || [];
-          for (const loadedPc of loadedPointClouds) {
-            if (loadedPc._visible !== false) {
-              targetPointCloudId = loadedPc.name;
-              break;
-            }
-          }
-        }
-        // Ultimate fallback: first point cloud
         if (!targetPointCloudId && pointClouds.length > 0) {
           targetPointCloudId = pointClouds[0].id;
         }
@@ -783,7 +692,12 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       const measurementId = measurement.uuid || measurement.id;
       if (!measurementId) return;
 
-      // Find and remove the measurement layer from all point clouds
+      // Sahne grafiğinden garanti kaldır (bazen Potree sadece diziden çıkarıyor)
+      if (measurement.parent) {
+        measurement.removeFromParent();
+      }
+
+      // Redux'tan measurement layer'ı kaldır
       const pointClouds = project?.metadata?.pointCloud || [];
       for (const pc of pointClouds) {
         if (pc.layers) {
@@ -1044,7 +958,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         markerMovedDebounceRef.current.clear();
       }
     };
-  }, [window.viewer, isPotreeReady, project?.metadata?.pointCloud]);
+  }, [window.viewer, isPotreeReady, project?.metadata?.pointCloud, pointCloudData?.id]);
 
   // Load point clouds from project metadata when store updates
   useEffect(() => {
@@ -1159,13 +1073,14 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       }
       previousPointCloudCountRef.current = currentCount;
 
-      // Load measurement layers after point clouds are loaded
+      // Load measurement and annotation layers after point clouds are loaded
       setTimeout(() => {
         loadMeasurementLayers();
+        loadAnnotationLayers();
       }, 1000); // Wait for point clouds to be fully loaded
     };
 
-    // Load measurement layers from project metadata
+    // Load measurement layers from project metadata (her zaman Redux'tan oku - closure eski kalmasın)
     const loadMeasurementLayers = () => {
       if (!window.viewer || !window.viewer.scene) return;
 
@@ -1173,7 +1088,8 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       isLoadingMeasurementsRef.current = true;
 
       try {
-        const pointClouds = project?.metadata?.pointCloud || [];
+        const currentProject = ProjectActions.getProjectState().project;
+        const pointClouds = currentProject?.metadata?.pointCloud || [];
 
         // Collect all measurements from all point clouds
         const allMeasurements: any[] = [];
@@ -1325,6 +1241,48 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       } finally {
         // Reset flag after loading is complete
         isLoadingMeasurementsRef.current = false;
+      }
+    };
+
+    // Load annotation layers from project metadata (Potree loadAnnotations ile; measurement olarak değil)
+    const loadAnnotationLayers = () => {
+      if (!window.viewer?.scene) return;
+      const loadAnnotationsFn = (window as any).Potree?.loadAnnotations;
+      if (typeof loadAnnotationsFn !== "function") return;
+
+      const currentProject = ProjectActions.getProjectState().project;
+      const pointClouds = currentProject?.metadata?.pointCloud || [];
+      const allAnnotations: Array<{
+        position: number[];
+        title: string;
+        description: string;
+        uuid: string;
+        offset?: number[];
+        children?: unknown[];
+      }> = [];
+
+      for (const pc of pointClouds) {
+        if (!pc.layers || pc.layers.length === 0) continue;
+
+        const annotationLayers = pc.layers.filter(
+          (layer) => layer.type === "annotation"
+        );
+
+        for (const layer of annotationLayers) {
+          const ann = layer as { position: [number, number, number]; title: string; content?: string; id: string };
+          allAnnotations.push({
+            position: [...ann.position],
+            title: ann.title,
+            description: ann.content ?? "",
+            uuid: ann.id,
+            offset: [0, 0, 0],
+            children: [],
+          });
+        }
+      }
+
+      if (allAnnotations.length > 0) {
+        loadAnnotationsFn(window.viewer, allAnnotations);
       }
     };
 

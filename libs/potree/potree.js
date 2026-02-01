@@ -66465,7 +66465,7 @@ void main() {
 
 			const annotation = loadAnnotationItem(item);
 
-			for(const childItem of item.children){
+			for(const childItem of (item.children || [])){
 				traverse(childItem, annotation);
 			}
 
@@ -82773,7 +82773,7 @@ ENDSEC
 			annotation.hideDistance = 2000;
 			annotation.minScaleDistance = 100;
 
-			annotation.installVisibilityUpdater(this.viewer);
+			// annotation.installVisibilityUpdater(this.viewer);
 
 			this.dispatchEvent({type: 'start_inserting_annotation', annotation: annotation});
 
@@ -82801,6 +82801,9 @@ ENDSEC
 
 			callbacks.finish = e => {
 				domElement.removeEventListener('mouseup', insertionCallback, true);
+				if (typeof window !== 'undefined' && window.eventBus) {
+					window.eventBus.emit('annotation_placed', { annotation: annotation });
+				}
 			};
 
 			domElement.addEventListener('mouseup', insertionCallback, true);
@@ -91067,7 +91070,9 @@ ENDSEC
 			let startPosition = view.position.clone();
 			let endPosition = camera.position.clone();
 			let startTarget = view.getPivot();
-			let endTarget = bs.center;
+			let box = node.boundingBox.clone().applyMatrix4(node.matrixWorld);
+			let endTarget = box.getCenter(new THREE.Vector3());
+			endTarget.z = box.min.z + (box.max.z - box.min.z) * 0.25;
 			let startRadius = view.radius;
 			let endRadius = endPosition.distanceTo(endTarget);
 
@@ -92030,7 +92035,7 @@ ENDSEC
 					}
 					
 					camera.near = 0.1;
-					camera.far = 5000;
+					camera.far = 45000;
 				}else {
 					// don't change near and far in this case
 				}
@@ -92984,6 +92989,7 @@ ENDSEC
 	exports.framenumber = framenumber;
 	exports.loadPointCloud = loadPointCloud$1;
 	exports.loadProject = loadProject;
+	exports.loadAnnotations = loadAnnotations;
 	exports.lru = lru;
 	exports.maxNodesLoading = maxNodesLoading;
 	exports.numNodesLoading = numNodesLoading;

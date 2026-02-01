@@ -42,6 +42,7 @@ import { RootState } from '../../store/store';
 import { manualSaveProject } from '../../services/ProjectAutoSave';
 import StatusBarActions from '../../store/actions/StatusBarActions';
 import AnnotationService from '../../services/AnnotationService';
+import AddAnnotationDialog from '../dialogs/AddAnnotationDialog';
 
 // Helper function to get icon name from LucideIcon component
 const getIconName = (icon: LucideIcon): string => {
@@ -490,9 +491,21 @@ function RibbonMenu() {
     }
   };
 
-  const handleAddAnnotation = () =>{
-    AnnotationService.add("ROTGIS Annonation Title", "ROTGIS CONTENT");
-  }
+  const [addAnnotationDialogOpen, setAddAnnotationDialogOpen] = useState(false);
+  const modelData = useSelector((state: RootState) => state.statusBarReducer.modelData);
+
+  const handleAddAnnotation = () => {
+    setAddAnnotationDialogOpen(true);
+  };
+
+  const handleAnnotationConfirm = (header: string, content: string) => {
+    const pointCloudId = modelData?.id;
+    if (!pointCloudId) {
+      console.warn("Annotation: Nokta bulutu seçili değil (modelData.id yok). Önce bir nokta bulutuna odaklanın.");
+      return;
+    }
+    AnnotationService.startInsertion(header, content, pointCloudId);
+  };
 
   const handleMeasurementToolClick = (toolType: string) => {
     // If the same tool is already selected, deselect it
@@ -679,7 +692,7 @@ function RibbonMenu() {
         {
           title: "Add",
           buttons: [
-            { label: "Add", icon: MessageSquarePlusIcon, variant: "default", onClick: () => handleAddAnnotation() },
+            { label: "Add", icon: MessageSquarePlusIcon, variant: "default", onClick: handleAddAnnotation },
             { label: "Import", icon: FileText, variant: "ghost" },
           ],
         },
@@ -819,6 +832,11 @@ function RibbonMenu() {
         onOpenChange={setShowSaveDialog}
         projectName={currentProject?.project.name || "Untitled Project"}
         onSave={handleSaveProject}
+      />
+      <AddAnnotationDialog
+        open={addAnnotationDialogOpen}
+        onOpenChange={setAddAnnotationDialogOpen}
+        onConfirm={handleAnnotationConfirm}
       />
       <div className="border-b border-border" style={styles.container}>
       <style>{`

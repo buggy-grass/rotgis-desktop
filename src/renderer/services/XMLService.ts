@@ -4,6 +4,7 @@ import {
   Metadata,
   OutCoordSys,
   MeasurementLayer,
+  AnnotationLayer,
 } from "../types/ProjectTypes";
 
 /**
@@ -298,7 +299,7 @@ function parsePointCloud(element: Element) {
       res: getNumberContent(element.querySelector("dsm > res")),
     },
     visible: getBooleanContent(element.querySelector("visible"), true), // Default to true
-    layers: parseMeasurementLayers(element.querySelector("layers")),
+    layers: parseLayers(element.querySelector("layers")),
   };
 }
 
@@ -372,12 +373,40 @@ function parseOutCoordSys(element: Element | null): OutCoordSys {
   };
 }
 
-function parseMeasurementLayers(element: Element | null): MeasurementLayer[] {
+function parseLayers(element: Element | null): (MeasurementLayer | AnnotationLayer)[] {
   if (!element) {
     return [];
   }
   const layerElements = element.querySelectorAll("layer");
-  return Array.from(layerElements).map((layerEl) => parseMeasurementLayer(layerEl));
+  return Array.from(layerElements).map((layerEl) => {
+    const type = getTextContent(layerEl.querySelector("type")) || "measurement";
+    return type === "annotation"
+      ? parseAnnotationLayer(layerEl)
+      : parseMeasurementLayer(layerEl);
+  });
+}
+
+function parseAnnotationLayer(element: Element): AnnotationLayer {
+  const positionEl = element.querySelector("position");
+  const position: [number, number, number] = positionEl
+    ? [
+        getNumberContent(positionEl.querySelector("x")),
+        getNumberContent(positionEl.querySelector("y")),
+        getNumberContent(positionEl.querySelector("z")),
+      ]
+    : [0, 0, 0];
+
+  return {
+    id: getTextContent(element.querySelector("id")),
+    name: getTextContent(element.querySelector("name")),
+    type: "annotation" as const,
+    visible: getBooleanContent(element.querySelector("visible"), true),
+    pointCloudId: getTextContent(element.querySelector("pointCloudId")),
+    title: getTextContent(element.querySelector("title")) || "",
+    content: getTextContent(element.querySelector("content")) || "",
+    position,
+    extent: parseBBox(element.querySelector("extent")),
+  };
 }
 
 function parseMeasurementLayer(element: Element): MeasurementLayer {
@@ -472,11 +501,15 @@ function serializePointCloud(pc: any, indent: string): string {
   parts.push(`${indent}        <file>${escapeXML(pc.dsm.file)}</file>`);
   parts.push(`${indent}        <res>${pc.dsm.res}</res>`);
   parts.push(`${indent}    </dsm>`);
-  // Serialize measurement layers
+  // Serialize layers (measurement ve annotation)
   if (pc.layers && pc.layers.length > 0) {
     parts.push(`${indent}    <layers>`);
     pc.layers.forEach((layer: any) => {
-      parts.push(serializeMeasurementLayer(layer, `${indent}        `));
+      parts.push(
+        layer.type === "annotation"
+          ? serializeAnnotationLayer(layer, `${indent}        `)
+          : serializeMeasurementLayer(layer, `${indent}        `)
+      );
     });
     parts.push(`${indent}    </layers>`);
   }
@@ -534,12 +567,34 @@ function serializeCenter(center: any, indent: string): string {
   return parts.join("\n");
 }
 
+function serializeAnnotationLayer(layer: AnnotationLayer, indent: string): string {
+  const parts: string[] = [];
+  parts.push(`${indent}<layer>`);
+  parts.push(`${indent}    <id>${escapeXML(layer.id)}</id>`);
+  parts.push(`${indent}    <name>${escapeXML(layer.name)}</name>`);
+  parts.push(`${indent}    <type>annotation</type>`);
+  parts.push(`${indent}    <visible>${layer.visible}</visible>`);
+  parts.push(`${indent}    <pointCloudId>${escapeXML(layer.pointCloudId)}</pointCloudId>`);
+  parts.push(`${indent}    <title>${escapeXML(layer.title)}</title>`);
+  parts.push(`${indent}    <content>${escapeXML(layer.content)}</content>`);
+  parts.push(`${indent}    <position>`);
+  parts.push(`${indent}        <x>${layer.position[0]}</x>`);
+  parts.push(`${indent}        <y>${layer.position[1]}</y>`);
+  parts.push(`${indent}        <z>${layer.position[2]}</z>`);
+  parts.push(`${indent}    </position>`);
+  parts.push(`${indent}    <extent>`);
+  parts.push(serializeBBox(layer.extent, `${indent}        `));
+  parts.push(`${indent}    </extent>`);
+  parts.push(`${indent}</layer>`);
+  return parts.join("\n");
+}
+
 function serializeMeasurementLayer(layer: MeasurementLayer, indent: string): string {
   const parts: string[] = [];
   parts.push(`${indent}<layer>`);
   parts.push(`${indent}    <id>${escapeXML(layer.id)}</id>`);
   parts.push(`${indent}    <name>${escapeXML(layer.name)}</name>`);
-  parts.push(`${indent}    <type>${layer.type}</type>`);
+  parts.push(`${indent}    <type>measurement</type>`);
   parts.push(`${indent}    <visible>${layer.visible}</visible>`);
   parts.push(`${indent}    <extent>`);
   parts.push(serializeBBox(layer.extent, `${indent}        `));

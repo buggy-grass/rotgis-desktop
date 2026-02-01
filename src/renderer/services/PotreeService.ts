@@ -242,18 +242,70 @@ class PotreeService {
     }
   }
 
-  static async removeMeasurement(id: string) {
+  /**
+   * Annotation'ı Potree viewer'dan kaldırır (scene.annotations children'dan).
+   */
+  static removeAnnotation(annotationId: string): void {
     try {
-      if (window.viewer) {
-        const existMeasurement = window.viewer.scene.measurements.find(
-          (measure: any) => measure.uuid == id
-        );
-        if (existMeasurement) {
-          window.viewer.scene.removeMeasurement(existMeasurement);
+      if (!window.viewer?.scene?.annotations) return;
+
+      const root = window.viewer.scene.annotations as {
+        traverse: (fn: (a: any) => void) => void;
+        remove: (annotation: any) => void;
+      };
+      let found: any = null;
+      root.traverse((a: any) => {
+        if (a.uuid === annotationId || (a.id != null && String(a.id) === String(annotationId))) {
+          found = a;
         }
+      });
+      if (found && found.parent && typeof found.parent.remove === "function") {
+        found.parent.remove(found);
       }
     } catch (error) {
-      console.error(error);
+      console.error("PotreeService.removeAnnotation:", error);
+    }
+  }
+
+  /**
+   * Measurement'ı Potree viewer'dan garanti siler: measurements dizisinden + measuring tool sahnesinden.
+   */
+  static removeMeasurement(id: string): void {
+    try {
+      if (!window.viewer?.scene) return;
+
+      const scene = window.viewer.scene;
+      const measuringTool = (window.viewer as any).measuringTool;
+      const matchId = (m: any) =>
+        m.uuid === id || m.uuid === String(id) || (m.id != null && String(m.id) === String(id));
+
+      // Önce measurements dizisinden bul
+      let measurement = scene.measurements.find(matchId);
+
+      // Dizide yoksa measuring tool sahnesinin child'larında ara (senkron kaymasına karşı)
+      if (!measurement && measuringTool?.scene?.children) {
+        measurement = measuringTool.scene.children.find(
+          (child: any) => child.uuid != null && matchId(child)
+        ) as any;
+      }
+
+      if (!measurement) return;
+
+      // 1) Measuring tool'un THREE.Scene'inden kaldır (ölçümler burada render ediliyor)
+      if (measuringTool?.scene?.remove) {
+        measuringTool.scene.remove(measurement);
+      }
+      // 2) Başka bir parent'a eklenmişse oradan da kaldır
+      if (measurement.parent) {
+        measurement.removeFromParent();
+      }
+      // 3) Potree scene.measurements dizisinden çıkar (dizide varsa)
+      const idx = scene.measurements.indexOf(measurement);
+      if (idx > -1) {
+        scene.removeMeasurement(measurement);
+      }
+    } catch (error) {
+      console.error("PotreeService.removeMeasurement:", error);
     }
   }
 
@@ -693,10 +745,10 @@ class PotreeService {
       if (bbox) {
         const node = new window.THREE.Object3D();
         node.boundingBox = bbox;
-        window.viewer.zoomTo(node, 1.0, 500);
+        window.viewer.zoomTo(node, 0.3, 500);
       } else {
         // Fallback: direct zoom
-        window.viewer.zoomTo(pointCloud, 1.0, 500);
+        window.viewer.zoomTo(pointCloud, 0.3, 500);
       }
 
       // Store the active point cloud ID in a global variable for measurement tracking
