@@ -56092,7 +56092,9 @@
 			this.__visible = true;
 			this._display = true;
 			this._expand = false;
-			this.collapseThreshold = [args.collapseThreshold, 100].find(e => e !== undefined);
+			this.collapseThreshold = 1500;
+			this.hideDistance = 150;   // bundan sonra gizle
+			this.minScaleDistance = 20;
 
 			this.children = [];
 			this.parent = null;
@@ -56121,14 +56123,14 @@
 			this.elDescriptionClose = this.elDescription.find('.annotation-description-close');
 			// this.elDescriptionContent = this.elDescription.find(".annotation-description-content");
 
-			this.clickTitle = () => {
-				if(this.hasView()){
-					this.moveHere(this.scene.getActiveCamera());
-				}
-				this.dispatchEvent({type: 'click', target: this});
-			};
+			// this.clickTitle = () => {
+			// 	if(this.hasView()){
+			// 		this.moveHere(this.scene.getActiveCamera());
+			// 	}
+			// 	this.dispatchEvent({type: 'click', target: this});
+			// };
 
-			this.elTitle.click(this.clickTitle);
+			// this.elTitle.click(this.clickTitle);
 
 			this.actions = this.actions.map(a => {
 				if (a instanceof Action) {
@@ -56169,7 +56171,33 @@
 			//this.display = true;
 
 		}
+		
+		installVisibilityUpdater(viewer) {
 
+			const update = () => {
+			  if (!this.position) return;
+		  
+			  const camera = viewer.scene.getActiveCamera();
+			  const distance = camera.position.distanceTo(this.position);
+		  
+			  // ------------------------
+			  // 1️⃣ GÖRÜNÜRLÜK
+			  // ------------------------
+			  if (distance > this.hideDistance) {
+				this.visible = false;
+				this.display = false;
+				return;
+			  } else {
+				this.visible = true;
+				this.display = true;
+			  }
+			};
+		  
+			viewer.addEventListener("update", update);
+		  
+			this._visibilityUpdate = update;
+		  }
+		  
 		installHandles(viewer){
 			if(this.handles !== undefined){
 				return;
@@ -56359,10 +56387,10 @@
 			this._display = display;
 
 			if (display) {
-				// this.domElement.fadeIn(200);
+				this.domElement.fadeIn(300);
 				this.domElement.show();
 			} else {
-				// this.domElement.fadeOut(200);
+				this.domElement.fadeOut(300);
 				this.domElement.hide();
 			}
 		}
@@ -56542,7 +56570,7 @@
 
 				if (this._description) {
 					this.descriptionVisible = true;
-					this.elDescription.fadeIn(200);
+					this.elDescription.fadeIn(300);
 					this.elDescription.css('position', 'relative');
 				}
 			} else {
@@ -56573,7 +56601,7 @@
 			}
 
 			let view = this.scene.view;
-			let animationDuration = 500;
+			let animationDuration = 2500;
 			let easing = TWEEN.Easing.Quartic.Out;
 
 			let endTarget;
@@ -66437,7 +66465,7 @@ void main() {
 
 			const annotation = loadAnnotationItem(item);
 
-			for(const childItem of item.children){
+			for(const childItem of (item.children || [])){
 				traverse(childItem, annotation);
 			}
 
@@ -73876,7 +73904,7 @@ void main() {
 				};
 
 				feature.onClick = evt => {
-					annotation.clickTitle();
+					// annotation.clickTitle();
 				};
 
 				this.getAnnotationsLayer().getSource().addFeature(feature);
@@ -82739,9 +82767,14 @@ ENDSEC
 
 			let annotation = new Annotation({
 				position: [589748.270, 231444.540, 753.675],
-				title: "Annotation Title",
-				description: `Annotation Description`
+				title: args.title ?? "Annotation Title",
+				description: args.description ?? `Annotation Description`
 			});
+			annotation.hideDistance = 2000;
+			annotation.minScaleDistance = 100;
+
+			// annotation.installVisibilityUpdater(this.viewer);
+
 			this.dispatchEvent({type: 'start_inserting_annotation', annotation: annotation});
 
 			const annotations = this.viewer.scene.annotations;
@@ -82768,6 +82801,9 @@ ENDSEC
 
 			callbacks.finish = e => {
 				domElement.removeEventListener('mouseup', insertionCallback, true);
+				if (typeof window !== 'undefined' && window.eventBus) {
+					window.eventBus.emit('annotation_placed', { annotation: annotation });
+				}
 			};
 
 			domElement.addEventListener('mouseup', insertionCallback, true);
@@ -84271,10 +84307,10 @@ ENDSEC
 				  // =========================
 				  // ROTGIS YAZISI (YATAY)
 				  // =========================
-				  const textGeo = new THREE.TextGeometry("RotGIS", {
+				  const textGeo = new THREE.TextGeometry("R", {
 					font: font,
-					size: 0.75,
-					height: 0.12,
+					size: 2.5,
+					height: 0.40,
 					curveSegments: 12,
 					bevelEnabled: true,
 					bevelThickness: 0.1,
@@ -84419,25 +84455,26 @@ ENDSEC
 						}}, true);
 					}
 
-				let activeModel = "none";
-				if(I.pointcloud){
-						activeModel = "point-cloud";
-					}
-					if(I.object){
-						activeModel = "mesh-model";
-					}
-					window.eventBus.emit("setLookingModel", {
-						type: activeModel
-					});
+				// let activeModel = "none";
+				// if(I.pointcloud){
+				// 		activeModel = "point-cloud";
+				// 	}
+				// 	if(I.object){
+				// 		activeModel = "mesh-model";
+				// 	}
+				// 	window.eventBus.emit("setLookingModel", {
+				// 		type: activeModel
+				// 	});
 
 				if (I) {
 					this.pivot = I.location;
 					this.camStart = this.scene.getActiveCamera().clone();
 					this.pivotIndicator.visible = true;
 					this.pivotIndicator.position.copy(I.location);
+					console.error(this.camStart)
 
 					this.rotatePivot = true;
-					this.pivotIndicator.rotation.z = 0.8;
+					this.pivotIndicator.rotation.z = this.camStart.rotation._z;
 				}
 
 				if(e.button == this.viewer.zoomButton){
@@ -91033,7 +91070,9 @@ ENDSEC
 			let startPosition = view.position.clone();
 			let endPosition = camera.position.clone();
 			let startTarget = view.getPivot();
-			let endTarget = bs.center;
+			let box = node.boundingBox.clone().applyMatrix4(node.matrixWorld);
+			let endTarget = box.getCenter(new THREE.Vector3());
+			endTarget.z = box.min.z + (box.max.z - box.min.z) * 0.25;
 			let startRadius = view.radius;
 			let endRadius = endPosition.distanceTo(endTarget);
 
@@ -91996,7 +92035,7 @@ ENDSEC
 					}
 					
 					camera.near = 0.1;
-					camera.far = 5000;
+					camera.far = 45000;
 				}else {
 					// don't change near and far in this case
 				}
@@ -92950,6 +92989,7 @@ ENDSEC
 	exports.framenumber = framenumber;
 	exports.loadPointCloud = loadPointCloud$1;
 	exports.loadProject = loadProject;
+	exports.loadAnnotations = loadAnnotations;
 	exports.lru = lru;
 	exports.maxNodesLoading = maxNodesLoading;
 	exports.numNodesLoading = numNodesLoading;

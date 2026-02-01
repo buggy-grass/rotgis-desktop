@@ -40,6 +40,7 @@ import {
   Mesh,
   Orthophoto,
   MeasurementLayer,
+  AnnotationLayer,
 } from "../../types/ProjectTypes";
 import PotreeService from "../../services/PotreeService";
 import ProjectActions from "../../store/actions/ProjectActions";
@@ -49,8 +50,8 @@ interface Layer {
   id: string;
   name: string;
   visible: boolean;
-  type: "point-cloud" | "mesh" | "orthophoto" | "dsm" | "dtm" | "measurement";
-  data?: PointCloud | Mesh | Orthophoto | MeasurementLayer;
+  type: "point-cloud" | "mesh" | "orthophoto" | "dsm" | "dtm" | "measurement" | "annotation";
+  data?: PointCloud | Mesh | Orthophoto | MeasurementLayer | AnnotationLayer;
   children?: Layer[];
 }
 
@@ -131,7 +132,6 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
       children:
         validPointClouds && validPointClouds.length > 0
           ? validPointClouds.map((pc) => {
-              // Get measurement layers for this point cloud
               const measurementLayers: Layer[] = (pc.layers || [])
                 .filter((layer) => layer.type === "measurement")
                 .map((layer) => ({
@@ -141,37 +141,45 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                   type: "measurement" as const,
                   data: layer,
                 }));
+              const annotationLayers: Layer[] = (pc.layers || [])
+                .filter((layer) => layer.type === "annotation")
+                .map((layer) => ({
+                  id: layer.id,
+                  name: (layer as AnnotationLayer).title,
+                  visible: layer.visible,
+                  type: "annotation" as const,
+                  data: layer as AnnotationLayer,
+                }));
 
               return {
                 id: pc.id,
                 name: `${pc.name}${pc.extension}`,
-                visible: pc.visible !== false, // Use pointCloud.visible from Redux
+                visible: pc.visible !== false,
                 type: "point-cloud",
                 data: pc,
-                children:
-                  measurementLayers.length > 0 ? measurementLayers : undefined,
+                children: [...measurementLayers, ...annotationLayers],
               };
             })
           : [],
     });
 
     // Mesh Layer - always show, even if empty
-    layersArray.push({
-      id: "mesh-parent",
-      name: "Mesh Layer",
-      visible: true, // Parent layers are always visible
-      type: "mesh",
-      children:
-        mesh && mesh.length > 0
-          ? mesh.map((m) => ({
-              id: m.id,
-              name: m.name,
-              visible: true, // Default to true for other layer types
-              type: "mesh",
-              data: m,
-            }))
-          : [],
-    });
+    // layersArray.push({
+    //   id: "mesh-parent",
+    //   name: "Mesh Layer",
+    //   visible: true, // Parent layers are always visible
+    //   type: "mesh",
+    //   children:
+    //     mesh && mesh.length > 0
+    //       ? mesh.map((m) => ({
+    //           id: m.id,
+    //           name: m.name,
+    //           visible: true, // Default to true for other layer types
+    //           type: "mesh",
+    //           data: m,
+    //         }))
+    //       : [],
+    // });
 
     // Vector Layer (Orthophoto, DSM, DTM) - always show, even if empty
     const vectorChildren: Layer[] = [];
@@ -223,13 +231,23 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
     return layersArray;
   }, [project?.metadata, validPointClouds]);
 
-  // Get all layer IDs that have children
+  // Get all layer IDs that have children or are point clouds (Measurements/Annotation accordion için)
   const getAllLayerIdsWithChildren = (items: Layer[]): string[] => {
     const ids: string[] = [];
     items.forEach((item) => {
-      if (item.children && item.children.length > 0) {
+      const isPointCloudRow =
+        item.type === "point-cloud" &&
+        item.id !== "point-cloud-parent" &&
+        item.id !== "vector-parent";
+      if (isPointCloudRow || (item.children && item.children.length > 0)) {
         ids.push(item.id);
-        ids.push(...getAllLayerIdsWithChildren(item.children));
+        // Nokta bulutu altındaki Measurements ve Annotation accordion'ları da açılsın
+        if (isPointCloudRow) {
+          ids.push(`${item.id}-measurements`, `${item.id}-annotation`);
+        }
+        if (item.children && item.children.length > 0) {
+          ids.push(...getAllLayerIdsWithChildren(item.children));
+        }
       }
     });
     return ids;
@@ -315,7 +333,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
       const measurementLayer = pointCloud?.layers?.find(
         (l) => l.id === layerId
       );
-      if (measurementLayer) {
+        if (measurementLayer) {
         const currentVisible = measurementLayer.visible;
         ProjectActions.updateMeasurementLayerVisibility(
           pointCloudId,
@@ -332,6 +350,22 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
             measurement.visible = !currentVisible;
           }
         }
+      }
+    } else if (layerType === "annotation" && pointCloudId) {
+      const currentState = ProjectActions.getProjectState();
+      const pointCloud = currentState.project?.metadata?.pointCloud?.find(
+        (pc) => pc.id === pointCloudId
+      );
+      const annotationLayer = pointCloud?.layers?.find(
+        (l) => l.id === layerId && l.type === "annotation"
+      );
+      if (annotationLayer) {
+        const currentVisible = annotationLayer.visible;
+        ProjectActions.updateAnnotationLayerVisibility(
+          pointCloudId,
+          layerId,
+          !currentVisible
+        );
       }
     } else {
       // For other layer types, use local state (if needed in future)
@@ -381,18 +415,28 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
     parentPointCloudId?: string
   ): React.ReactNode => {
     const hasChildren = layer.children && layer.children.length > 0;
-    // For point clouds, get visibility from Redux; for measurements, get from data; for others, default to true
+    const isPointCloudRow =
+      layer.type === "point-cloud" &&
+      layer.id !== "point-cloud-parent" &&
+      layer.id !== "vector-parent";
+    // Nokta bulutu satırları her zaman açılabilir (Measurements/Annotation sekmeleri)
+    const hasExpandableContent = isPointCloudRow || hasChildren;
+    // For point clouds, get visibility from Redux; for measurements/annotations, get from data
     const isVisible =
       layer.type === "point-cloud" && layer.data
         ? (layer.data as PointCloud).visible !== false
         : layer.type === "measurement" && layer.data
         ? (layer.data as MeasurementLayer).visible
+        : layer.type === "annotation" && layer.data
+        ? (layer.data as AnnotationLayer).visible
         : true;
 
-    // Get point cloud ID for measurement layers
+    // Get point cloud ID for measurement/annotation layers
     const pointCloudId =
       layer.type === "measurement" && layer.data
         ? (layer.data as MeasurementLayer).pointCloudId
+        : layer.type === "annotation" && layer.data
+        ? (layer.data as AnnotationLayer).pointCloudId
         : layer.type === "point-cloud"
         ? layer.id
         : parentPointCloudId;
@@ -403,7 +447,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         ? getMeasurementIcon((layer.data as MeasurementLayer).icon)
         : LayersIcon;
 
-    if (hasChildren) {
+    if (hasExpandableContent) {
       const isExpanded = expandedItems.includes(layer.id);
       
       const handleLayerClick = () => {
@@ -550,11 +594,81 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                 </ContextMenuContent>
               )}
               <AccordionContent className="pb-0 pt-0">
-                <div className="pl-4">
-                  {layer.children!.map((child) =>
-                    renderLayer(child, level + 1, pointCloudId)
-                  )}
-                </div>
+                {isPointCloudRow ? (
+                  <div className="pl-3">
+                    <Accordion
+                      type="multiple"
+                      className="w-full"
+                      value={[
+                        ...(expandedItems.includes(`${layer.id}-measurements`)
+                          ? [`${layer.id}-measurements`]
+                          : []),
+                        ...(expandedItems.includes(`${layer.id}-annotation`)
+                          ? [`${layer.id}-annotation`]
+                          : []),
+                      ]}
+                      onValueChange={(value) => {
+                        setExpandedItems((prev) => {
+                          const without = prev.filter(
+                            (id) =>
+                              id !== `${layer.id}-measurements` &&
+                              id !== `${layer.id}-annotation`
+                          );
+                          return [...without, ...(Array.isArray(value) ? value : [value])];
+                        });
+                      }}
+                    >
+                      <AccordionItem
+                        value={`${layer.id}-measurements`}
+                        className="border-none"
+                      >
+                        <AccordionTrigger className="py-0.5 px-1.5 hover:bg-accent rounded-sm text-[10px] min-h-0">
+                          Measurements
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-0 pt-0 pl-2">
+                          {(layer.children || []).filter((c) => c.type === "measurement").length > 0 ? (
+                            (layer.children || [])
+                              .filter((c) => c.type === "measurement")
+                              .map((child) =>
+                                renderLayer(child, level + 1, pointCloudId)
+                              )
+                          ) : (
+                            <div className="text-[10px] text-muted-foreground py-1.5">
+                              Ölçüm yok
+                            </div>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem
+                        value={`${layer.id}-annotation`}
+                        className="border-none"
+                      >
+                        <AccordionTrigger className="py-0.5 px-1.5 hover:bg-accent rounded-sm text-[10px] min-h-0">
+                          Annotation
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-0 pt-0 pl-2">
+                          {(layer.children || []).filter((c) => c.type === "annotation").length > 0 ? (
+                            (layer.children || [])
+                              .filter((c) => c.type === "annotation")
+                              .map((child) =>
+                                renderLayer(child, level + 1, pointCloudId)
+                              )
+                          ) : (
+                            <div className="text-[10px] text-muted-foreground py-1.5">
+                              Henüz annotation yok
+                            </div>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </div>
+                ) : (
+                  <div className="pl-4">
+                    {layer.children!.map((child) =>
+                      renderLayer(child, level + 1, pointCloudId)
+                    )}
+                  </div>
+                )}
               </AccordionContent>
             </AccordionItem>
           </Accordion>
@@ -568,9 +682,11 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         } else if (layer.type === "mesh" && layer.data) {
           PotreeService.focusToMesh(layer.id);
         } else if (layer.type === "measurement" && layer.data) {
-          // Focus to measurement extent
           const measurementLayer = layer.data as MeasurementLayer;
           PotreeService.focusToMeasure(measurementLayer.extent);
+        } else if (layer.type === "annotation" && layer.data) {
+          const annotationLayer = layer.data as AnnotationLayer;
+          PotreeService.focusToMeasure(annotationLayer.extent);
         }
       };
 
@@ -621,21 +737,17 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         } else if (layer.type === "measurement" && layer.data && pointCloudId) {
           const measurementLayer = layer.data as MeasurementLayer;
 
-          // Remove from Potree viewer
-          if (window.viewer && window.viewer.scene) {
-            const measurement = window.viewer.scene.measurements.find(
-              (m: any) => m.uuid === measurementLayer.id
-            );
-            if (measurement) {
-              window.viewer.scene.removeMeasurement(measurement);
-            }
-          }
-
-          // Remove from Redux store
+          // Önce Redux'tan sil ki project güncellenince loadMeasurementLayers eski state ile tekrar yüklemesin
           ProjectActions.removeMeasurementLayer(
             pointCloudId,
             measurementLayer.id
           );
+          // Sonra Potree'den kaldır (Redux güncel, ekrana tekrar gelmez)
+          PotreeService.removeMeasurement(measurementLayer.id);
+        } else if (layer.type === "annotation" && layer.data && pointCloudId) {
+          // Önce Redux ve dosyadan sil, sonra Potree sahnesinden kaldır
+          ProjectActions.removeAnnotationLayer(pointCloudId, layer.id);
+          PotreeService.removeAnnotation(layer.id);
         }
       };
 
@@ -654,7 +766,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
           <ContextMenuTrigger asChild>
             <div
               className={`flex items-center gap-1 hover:bg-accent rounded-sm cursor-pointer min-w-0 ${
-                layer.type === "measurement"
+                layer.type === "measurement" || layer.type === "annotation"
                   ? "py-0.5 px-1.5 text-[10px]"
                   : "py-1 px-2 text-xs"
               }`}
@@ -677,13 +789,15 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                          : undefined
                      }
                    />
+                 ) : layer.type === "annotation" ? (
+                   <LayersIcon className="h-2.5 w-2.5 text-blue-400 flex-shrink-0" />
                  ) : (
                    <LayersIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                  )}
                 <span
                   className="truncate flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
                   style={{
-                    maxWidth: layer.type === "measurement" ? "120px" : "126px",
+                    maxWidth: layer.type === "measurement" || layer.type === "annotation" ? "120px" : "126px",
                   }}
                 >
                   {layer.name}
@@ -700,7 +814,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                   >
                     <div
                       className={`flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer ${
-                        layer.type === "measurement"
+                        layer.type === "measurement" || layer.type === "annotation"
                           ? "h-5 w-5 p-0.5"
                           : "h-7 w-7 p-1.5"
                       }`}
@@ -715,7 +829,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                       {isVisible ? (
                         <Eye
                           className={
-                            layer.type === "measurement"
+                            layer.type === "measurement" || layer.type === "annotation"
                               ? "h-2.5 w-2.5"
                               : "h-3 w-3"
                           }
@@ -723,20 +837,21 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                       ) : (
                         <EyeOff
                           className={`text-muted-foreground ${
-                            layer.type === "measurement"
+                            layer.type === "measurement" || layer.type === "annotation"
                               ? "h-2.5 w-2.5"
                               : "h-3 w-3"
                           }`}
                         />
                       )}
                     </div>
-                    {/* Show focus button for point clouds, meshes, and measurements */}
+                    {/* Show focus button for point clouds, meshes, measurements, annotations */}
                     {(layer.type === "point-cloud" ||
                       layer.type === "mesh" ||
-                      layer.type === "measurement") && (
+                      layer.type === "measurement" ||
+                      layer.type === "annotation") && (
                       <div
                         className={`flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer ${
-                          layer.type === "measurement"
+                          layer.type === "measurement" || layer.type === "annotation"
                             ? "h-5 w-5 p-0.5"
                             : "h-7 w-7 p-1.5"
                         }`}
@@ -749,7 +864,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                       >
                         <Scan
                           className={
-                            layer.type === "measurement"
+                            layer.type === "measurement" || layer.type === "annotation"
                               ? "h-2.5 w-2.5"
                               : "h-3 w-3"
                           }
@@ -787,7 +902,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                 )}
             </div>
           </ContextMenuTrigger>
-          {/* Context menu only for point-cloud layers, not for measurement or parent layers */}
+          {/* Context menu: point-cloud = Properties + Delete, measurement = Delete only */}
           {layer.type === "point-cloud" && (
             <ContextMenuContent>
               <ContextMenuItem
@@ -797,6 +912,28 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                 <Info className="mr-2 h-3 w-3" />
                 Properties
               </ContextMenuItem>
+              <ContextMenuItem
+                onClick={handleDelete}
+                className="text-xs text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-3 w-3" />
+                Delete
+              </ContextMenuItem>
+            </ContextMenuContent>
+          )}
+          {layer.type === "measurement" && (
+            <ContextMenuContent>
+              <ContextMenuItem
+                onClick={handleDelete}
+                className="text-xs text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-3 w-3" />
+                Delete
+              </ContextMenuItem>
+            </ContextMenuContent>
+          )}
+          {layer.type === "annotation" && (
+            <ContextMenuContent>
               <ContextMenuItem
                 onClick={handleDelete}
                 className="text-xs text-destructive focus:text-destructive"

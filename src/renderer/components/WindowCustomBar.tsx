@@ -4,7 +4,7 @@ import { Minus, Square, X, Proportions, Settings, Cog } from "lucide-react";
 import { Button } from "./ui/button";
 import { RootState } from "../store/store";
 import WindowMenu from "./menu/WindowMenu";
-import AppIcon from '../assets/app/Untitled.ico';
+import AppIcon from '../assets/app/Unt.png';
 import SettingsActions from "../store/actions/SettingsActions";
 
 export function WindowCustomBar() {

@@ -1,6 +1,6 @@
 import IProjectState from "../../models/IProjectState";
 import store from "../store";
-import { ProjectXML, PointCloud, Mesh, Orthophoto, MeasurementLayer } from "../../types/ProjectTypes";
+import { ProjectXML, PointCloud, Mesh, Orthophoto, MeasurementLayer, AnnotationLayer } from "../../types/ProjectTypes";
 
 class ProjectActions {
   static getProjectState(): IProjectState {
@@ -442,6 +442,159 @@ class ProjectActions {
     const updatedPointCloud = {
       ...pointCloud,
       layers: [...existingLayers, measurementLayer],
+    };
+
+    const updatedPointClouds = [...existingPointClouds];
+    updatedPointClouds[pointCloudIndex] = updatedPointCloud;
+
+    const updatedProject: ProjectXML = {
+      ...currentState.project,
+      metadata: {
+        ...currentState.project.metadata,
+        pointCloud: updatedPointClouds,
+      },
+    };
+
+    store.dispatch({
+      type: "PROJECT/UPDATE_PROJECT",
+      payload: { project: updatedProject },
+    });
+  }
+
+  /**
+   * Add an annotation layer to a point cloud
+   * @param pointCloudId The ID of the point cloud (modelData.id)
+   * @param annotationLayer The annotation layer to add
+   */
+  static addAnnotationLayer(pointCloudId: string, annotationLayer: AnnotationLayer) {
+    const currentState = store.getState().projectReducer;
+    if (!currentState.project) {
+      console.error("Cannot add annotation layer: No project loaded");
+      return;
+    }
+
+    const existingPointClouds = currentState.project.metadata.pointCloud || [];
+    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+
+    if (pointCloudIndex === -1) {
+      console.error(`Cannot add annotation layer: Point cloud with ID ${pointCloudId} not found`);
+      return;
+    }
+
+    const pointCloud = existingPointClouds[pointCloudIndex];
+    const existingLayers = pointCloud.layers || [];
+
+    const existsById = existingLayers.some((layer) => layer.id === annotationLayer.id);
+    if (existsById) {
+      console.warn(`Annotation layer with ID ${annotationLayer.id} already exists, skipping add`);
+      return;
+    }
+
+    const updatedPointCloud = {
+      ...pointCloud,
+      layers: [...existingLayers, annotationLayer],
+    };
+
+    const updatedPointClouds = [...existingPointClouds];
+    updatedPointClouds[pointCloudIndex] = updatedPointCloud;
+
+    const updatedProject: ProjectXML = {
+      ...currentState.project,
+      metadata: {
+        ...currentState.project.metadata,
+        pointCloud: updatedPointClouds,
+      },
+    };
+
+    store.dispatch({
+      type: "PROJECT/UPDATE_PROJECT",
+      payload: { project: updatedProject },
+    });
+  }
+
+  /**
+   * Remove an annotation layer from a point cloud
+   * @param pointCloudId The ID of the point cloud
+   * @param layerId The ID of the annotation layer to remove
+   */
+  static removeAnnotationLayer(pointCloudId: string, layerId: string) {
+    const currentState = store.getState().projectReducer;
+    if (!currentState.project) {
+      console.error("Cannot remove annotation layer: No project loaded");
+      return;
+    }
+
+    const existingPointClouds = currentState.project.metadata.pointCloud || [];
+    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+
+    if (pointCloudIndex === -1) {
+      console.error(`Cannot remove annotation layer: Point cloud with ID ${pointCloudId} not found`);
+      return;
+    }
+
+    const pointCloud = existingPointClouds[pointCloudIndex];
+    const existingLayers = pointCloud.layers || [];
+    const updatedLayers = existingLayers.filter((layer) => layer.id !== layerId);
+
+    const updatedPointCloud = {
+      ...pointCloud,
+      layers: updatedLayers,
+    };
+
+    const updatedPointClouds = [...existingPointClouds];
+    updatedPointClouds[pointCloudIndex] = updatedPointCloud;
+
+    const updatedProject: ProjectXML = {
+      ...currentState.project,
+      metadata: {
+        ...currentState.project.metadata,
+        pointCloud: updatedPointClouds,
+      },
+    };
+
+    store.dispatch({
+      type: "PROJECT/UPDATE_PROJECT",
+      payload: { project: updatedProject },
+    });
+  }
+
+  /**
+   * Update annotation layer visibility
+   * @param pointCloudId The ID of the point cloud
+   * @param layerId The ID of the annotation layer
+   * @param visible The visibility state
+   */
+  static updateAnnotationLayerVisibility(
+    pointCloudId: string,
+    layerId: string,
+    visible: boolean
+  ) {
+    const currentState = store.getState().projectReducer;
+    if (!currentState.project) {
+      console.error("Cannot update annotation layer visibility: No project loaded");
+      return;
+    }
+
+    const existingPointClouds = currentState.project.metadata.pointCloud || [];
+    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+
+    if (pointCloudIndex === -1) {
+      console.error(`Cannot update annotation layer: Point cloud with ID ${pointCloudId} not found`);
+      return;
+    }
+
+    const pointCloud = existingPointClouds[pointCloudIndex];
+    const existingLayers = pointCloud.layers || [];
+    const updatedLayers = existingLayers.map((layer) => {
+      if (layer.id === layerId) {
+        return { ...layer, visible };
+      }
+      return layer;
+    });
+
+    const updatedPointCloud = {
+      ...pointCloud,
+      layers: updatedLayers,
     };
 
     const updatedPointClouds = [...existingPointClouds];
