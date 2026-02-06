@@ -14,44 +14,21 @@ export interface CommandOptions {
  * Also handles: [PROGRESS]: 52.20 (without INFO) or [INFO]: message (without PROGRESS)
  */
 const defaultProgressParser = (line: string): { percentage?: number; message?: string } | null => {
-  // Format: [INFO]: message [PROGRESS]: 52.20
-  // Try to match both INFO and PROGRESS together
-  const fullMatch = line.match(/\[INFO\]:\s*(.+?)\s*\[PROGRESS\]:\s*([\d.]+)/);
-  
-  if (fullMatch) {
-    // Both INFO and PROGRESS found
-    const message = fullMatch[1].trim();
-    const percentage = parseFloat(fullMatch[2]);
-    
+  // Skip separator lines like "====="
+  if (/^\s*=+\s*$/.test(line)) {
+    return null;
+  }
+  // Pattern: [14%, 1s], [COUNTING: 43%, duration: 1s, throughput: 6MPs]
+  const bracketProgressMatch = line.match(/^\s*\[(\d+(?:\.\d+)?)%\s*,[^\]]*]\s*,\s*\[([^\]]+)]/);
+  if (bracketProgressMatch) {
+    const percentage = parseFloat(bracketProgressMatch[1]);
+    const messageBlock = bracketProgressMatch[2].trim();
+    const message = messageBlock.split(",")[0]?.trim();
     return {
       percentage: Math.max(0, Math.min(100, percentage)),
-      message: message || undefined,
+      message: message && message.length > 0 ? message : undefined,
     };
   }
-  
-  // Try to match only PROGRESS: [PROGRESS]: 52.20
-  const progressOnlyMatch = line.match(/\[PROGRESS\]:\s*([\d.]+)/);
-  if (progressOnlyMatch) {
-    const percentage = parseFloat(progressOnlyMatch[1]);
-    // Try to extract message from before PROGRESS if exists
-    const messageMatch = line.match(/\[INFO\]:\s*(.+?)(?:\s*\[PROGRESS\]:|$)/);
-    const message = messageMatch ? messageMatch[1].trim() : undefined;
-    
-    return {
-      percentage: Math.max(0, Math.min(100, percentage)),
-      message: message,
-    };
-  }
-  
-  // Try to match only INFO: [INFO]: message
-  const infoOnlyMatch = line.match(/\[INFO\]:\s*(.+)/);
-  if (infoOnlyMatch) {
-    const message = infoOnlyMatch[1].trim();
-    return {
-      message: message,
-    };
-  }
-  
   return null;
 };
 

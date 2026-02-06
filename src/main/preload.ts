@@ -110,5 +110,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pathBasename: (filePath: string) => {
     return path.basename(filePath);
   },
+  // Database (better-sqlite3) - okuma/yazma
+  database: {
+    get: (sql: string, params?: unknown[]) =>
+      ipcRenderer.invoke('database-query', { operation: 'get', sql, params }),
+    all: (sql: string, params?: unknown[]) =>
+      ipcRenderer.invoke('database-query', { operation: 'all', sql, params }),
+    run: (sql: string, params?: unknown[]) =>
+      ipcRenderer.invoke('database-query', { operation: 'run', sql, params }),
+    exec: (sql: string) =>
+      ipcRenderer.invoke('database-query', { operation: 'exec', sql }),
+  },
 });
 
