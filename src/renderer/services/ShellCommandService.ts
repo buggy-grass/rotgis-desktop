@@ -81,6 +81,30 @@ export const converterProgressParser = (
   }
 
   return null;
+}
+
+/**
+ * Default progress parser for [INFO]: message [PROGRESS]: 52.20 format
+ * Also handles: [PROGRESS]: 52.20 (without INFO) or [INFO]: message (without PROGRESS)
+ */
+const defaultProgressParser = (line: string): { percentage?: number; message?: string } | null => {
+  // Skip separator lines like "====="
+  if (/^\s*=+\s*$/.test(line)) {
+    return null;
+  }
+  // Pattern: [14%, 1s], [COUNTING: 43%, duration: 1s, throughput: 6MPs]
+  const bracketProgressMatch = line.match(/^\s*\[(\d+(?:\.\d+)?)%\s*,[^\]]*]\s*,\s*\[([^\]]+)]/);
+  if (bracketProgressMatch) {
+    const percentage = parseFloat(bracketProgressMatch[1]);
+    const messageBlock = bracketProgressMatch[2].trim();
+    const message = messageBlock.split(",")[0]?.trim();
+    return {
+      percentage: Math.max(0, Math.min(100, percentage)),
+      message: message && message.length > 0 ? message : undefined,
+    };
+  }
+
+  return null;
 };
 
 const getProgressByType = (type: "converter" | "other") => {

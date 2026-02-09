@@ -152,7 +152,6 @@ class PotreeService {
     node.boundingBox = threebbox;
     window.viewer.zoomTo(node, 1, 500);
   };
-
   /**
    * Deletes a point cloud: removes its measurements/annotations from Potree,
    * removes the point cloud from the viewer, optionally deletes folder from disk,
@@ -287,6 +286,15 @@ class PotreeService {
       const annotations = window.viewer.scene.annotations.children ?? [];
       const existAnnotation = annotations.find((a: any) => a.uuid === annotationId);
       if (existAnnotation) root.remove(existAnnotation);
+      let found: any = null;
+      root.traverse((a: any) => {
+        if (a.uuid === annotationId || (a.id != null && String(a.id) === String(annotationId))) {
+          found = a;
+        }
+      });
+      if (found && found.parent && typeof found.parent.remove === "function") {
+        found.parent.remove(found);
+      }
     } catch (error) {
       console.error("PotreeService.removeAnnotation:", error);
     }

@@ -51,6 +51,12 @@ export interface ElectronAPI {
   pathJoin: (...paths: string[]) => string;
   pathDirname: (filePath: string) => string;
   pathBasename: (filePath: string) => string;
+  database: {
+    get: (sql: string, params?: unknown[]) => Promise<unknown>;
+    all: (sql: string, params?: unknown[]) => Promise<unknown[]>;
+    run: (sql: string, params?: unknown[]) => Promise<{ changes: number; lastInsertRowid: number | bigint }>;
+    exec: (sql: string) => Promise<void>;
+  };
 }
 
 declare global {

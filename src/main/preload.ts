@@ -78,7 +78,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     args?: string[];
     cwd?: string;
     env?: Record<string, string>;
-    captureOutput?: boolean;
   }) => {
     return ipcRenderer.invoke('execute-command', options);
   },
@@ -101,11 +100,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   copyFile: (sourcePath: string, destinationPath: string) => {
     return ipcRenderer.invoke('copy-file', sourcePath, destinationPath);
   },
-  // Raster local server (COG files via HTTP with Range support)
-  getRasterServerPort: () => ipcRenderer.invoke("get-raster-server-port") as Promise<number>,
-  setRasterServerPath: (projectPath: string | null) => {
-    ipcRenderer.send("set-raster-server-path", projectPath);
-  },
   // Path utilities
   pathJoin: (...paths: string[]) => {
     return path.join(...paths);
@@ -116,5 +110,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pathBasename: (filePath: string) => {
     return path.basename(filePath);
   },
+  // Database (better-sqlite3) - okuma/yazma
+  database: {
+    get: (sql: string, params?: unknown[]) =>
+      ipcRenderer.invoke('database-query', { operation: 'get', sql, params }),
+    all: (sql: string, params?: unknown[]) =>
+      ipcRenderer.invoke('database-query', { operation: 'all', sql, params }),
+    run: (sql: string, params?: unknown[]) =>
+      ipcRenderer.invoke('database-query', { operation: 'run', sql, params }),
+    exec: (sql: string) =>
+      ipcRenderer.invoke('database-query', { operation: 'exec', sql }),
+  },
 });
-

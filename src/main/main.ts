@@ -5,6 +5,12 @@ import { promisify } from "util";
 import * as fs from "fs";
 import * as fsPromises from "fs/promises";
 import { createServer, LocalServer } from "./server/server";
+import {
+  initDatabase,
+  closeDatabase,
+  handleDatabaseQuery,
+  type DatabaseQueryPayload,
+} from "./DatabaseService";
 
 const execAsync = promisify(exec);
 
@@ -552,6 +558,14 @@ ipcMain.handle("window-is-maximized", () => {
   return mainWindow ? mainWindow.isMaximized() : false;
 });
 
+// Database IPC handler (better-sqlite3)
+ipcMain.handle(
+  "database-query",
+  (_event, payload: DatabaseQueryPayload) => {
+    return handleDatabaseQuery(payload);
+  }
+);
+
 // File system IPC handlers
 interface FileSystemItem {
   name: string;
@@ -1073,6 +1087,18 @@ if (process.platform === "win32" && process.env.GPUSET !== "true" && !isDev) {
   }
   // App hazır olmadan önce performans ayarları
   app.whenReady().then(() => {
+    console.log("[Main] app.whenReady fired");
+    // Veritabanı bağlantısını başlat (models/*.sql migrations çalıştırılır)
+    try {
+      initDatabase();
+      console.log("[Main] Database init OK");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : "";
+      console.error("[Main] Database init failed:", msg);
+      if (stack) console.error("[Main] Stack:", stack);
+    }
+
     // Windows'ta App User Model ID ayarla (taskbar icon için önemli)
     if (process.platform === "win32") {
       app.setAppUserModelId("com.rotgis.desktop");
@@ -1247,6 +1273,7 @@ if (process.platform === "win32" && process.env.GPUSET !== "true" && !isDev) {
 app.on("before-quit", () => {
   rasterServer?.close();
   rasterServer = null;
+  closeDatabase();
   if (mainWindow) {
     mainWindow.removeAllListeners();
   }

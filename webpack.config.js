@@ -1,5 +1,6 @@
 const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const CopyWebpackPlugin = require("copy-webpack-plugin");
 const webpack = require("webpack");
 
 // Production optimizasyonları için helper
@@ -135,6 +136,22 @@ if (process.env.WEBPACK_SERVE) {
       output: {
         path: path.resolve(__dirname, "dist"),
         filename: "main.js",
+      },
+      plugins: [
+        new CopyWebpackPlugin({
+          patterns: [
+            {
+              from: path.resolve(__dirname, "src", "main", "models"),
+              to: path.resolve(__dirname, "dist", "models"),
+              noErrorOnMissing: true,
+            },
+          ],
+        }),
+      ],
+      // better-sqlite3 native modülü bundle'lama; runtime'da node_modules'den require ile yüklensin
+      externals: {
+        "better-sqlite3": "commonjs better-sqlite3",
+        bindings: "commonjs bindings",
       },
       resolve: {
         extensions: [".ts", ".js"],
