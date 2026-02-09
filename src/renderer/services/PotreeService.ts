@@ -153,91 +153,122 @@ class PotreeService {
     window.viewer.zoomTo(node, 1, 500);
   };
 
+  /**
+   * Deletes a point cloud: removes its measurements/annotations from Potree,
+   * removes the point cloud from the viewer, optionally deletes folder from disk,
+   * and always removes it from Redux.
+   */
   static async deletePointCloud(id: string) {
-    if (window.viewer) {
-      const pointClouds = window.viewer.scene.pointclouds;
-      for (let i = pointClouds.length - 1; i >= 0; i--) {
-        const pc = pointClouds[i];
-        if (pc.name == id) {
-          window.viewer.scene.scenePointCloud.remove(pointClouds[i]);
-          pc.root.geometryNode.dispose();
-          pointClouds.splice(i, 1);
+    if (!window.viewer) return;
 
-          const geometryNode = pc.root.geometryNode;
-          let sceneNode = pc.root.sceneNode;
-          const parent = pc.root;
-          const childIndex = parseInt(
-            geometryNode.name[geometryNode.name.length - 1]
-          );
-          //parent.sceneNode.remove(node.sceneNode);
-          //remove node from scene
-          parent.sceneNode.remove(sceneNode);
+    const pointClouds = window.viewer.scene.pointclouds;
+    const index = pointClouds.findIndex((pc: any) => pc.name === id);
+    if (index === -1) {
+      // Not in viewer (e.g. already removed or never loaded) – still remove from Redux
+      ProjectActions.deletePointCloud(id);
+      return;
+    }
 
-          //check if has geometry it could be removed also...
-          if (sceneNode.geometry) {
-            //delete attributes solve a big memory leak...
-            const attributes = sceneNode.geometry.attributes;
-            for (const key in attributes) {
-              if (key == "position") {
-                delete attributes[key].array;
-              }
-              delete attributes[key];
-            }
-            //dispose geometry
-            sceneNode.geometry.dispose();
-            sceneNode.geometry = undefined;
-          }
+    const pc = pointClouds[index];
+    const pointCloudId = pc.name;
 
-          //check if has material, can be removed...
-          if (sceneNode.material) {
-            //check if has material map, can be removed...
-            if (sceneNode.material.map) {
-              sceneNode.material.map.dispose();
-              sceneNode.material.map = undefined;
-            }
-            //dispose material
-            sceneNode.material.dispose();
-            sceneNode.material = undefined;
-          }
-
-          //delete matrix
-          delete sceneNode.matrix;
-          //delete matrixWorld
-          delete sceneNode.matrixWorld;
-          //delete position
-          delete sceneNode.position.array;
-          //delete qa
-          delete sceneNode.quaternion.array;
-          //delete rotation
-          delete sceneNode.rotation.array;
-          //delete scale
-          delete sceneNode.scale.array;
-          //delete up
-          delete sceneNode.up.array;
-          //delete sceneNode
-          sceneNode = undefined;
-          parent.children[childIndex] = geometryNode;
-
-          const pcFolderPath = await PathService.directoryPath(
-            pc.pcoGeometry.loader.url
-          );
-          const exist = await DirectoryService.exist(pcFolderPath);
-          if (exist) {
-            await DirectoryService.delete(pcFolderPath);
-            const existPointCloud =
-              ProjectActions.getProjectState().project?.metadata.pointCloud.find(
-                (pointCloud) => pointCloud.id == pc.name
-              );
-            if (existPointCloud && existPointCloud.layers) {
-              existPointCloud?.layers.forEach((element) => {
-                if (element.type == "measurement") {
-                  PotreeService.removeMeasurement(element.id);
-                }
-              });
-            }
-            ProjectActions.deletePointCloud(pc.id);
-          }
+    // 1) Remove all measurements and annotations for this point cloud from Potree (before removing pc)
+    const projectState = ProjectActions.getProjectState();
+    const metadataPc = projectState.project?.metadata?.pointCloud?.find(
+      (p) => p.id === pointCloudId
+    );
+    if (metadataPc?.layers) {
+      for (const layer of metadataPc.layers) {
+        if (layer.type === "measurement") {
+          PotreeService.removeMeasurement(layer.id);
         }
+        if (layer.type === "annotation") {
+          PotreeService.removeAnnotation(layer.id);
+        }
+      }
+    }
+
+    // 2) Remove point cloud from Potree scene and dispose
+    window.viewer.scene.scenePointCloud.remove(pc);
+    pc.root.geometryNode.dispose();
+    pointClouds.splice(index, 1);
+
+    const geometryNode = pc.root.geometryNode;
+    let sceneNode = pc.root.sceneNode;
+    const parent = pc.root;
+    const childIndex = parseInt(
+      geometryNode.name[geometryNode.name.length - 1],
+      10
+    );
+    parent.sceneNode.remove(sceneNode);
+
+    if (sceneNode.geometry) {
+      const attributes = sceneNode.geometry.attributes;
+      for (const key in attributes) {
+        if (key === "position") delete attributes[key].array;
+        delete attributes[key];
+      }
+      sceneNode.geometry.dispose();
+      sceneNode.geometry = undefined;
+    }
+    if (sceneNode.material) {
+      if (sceneNode.material.map) {
+        sceneNode.material.map.dispose();
+        sceneNode.material.map = undefined;
+      }
+      sceneNode.material.dispose();
+      sceneNode.material = undefined;
+    }
+    delete sceneNode.matrix;
+    delete sceneNode.matrixWorld;
+    delete sceneNode.position?.array;
+    delete sceneNode.quaternion?.array;
+    delete sceneNode.rotation?.array;
+    delete sceneNode.scale?.array;
+    delete sceneNode.up?.array;
+    sceneNode = undefined;
+    parent.children[childIndex] = geometryNode;
+
+    // 3) Delete folder from disk if it exists
+    try {
+      const pcFolderPath = await PathService.directoryPath(
+        pc.pcoGeometry.loader.url
+      );
+      const exist = await DirectoryService.exist(pcFolderPath);
+      if (exist) await DirectoryService.delete(pcFolderPath);
+    } catch (_) {
+      // Ignore disk errors; we still want to update Redux
+    }
+
+    // 4) Always remove from Redux so UI and project file stay in sync
+    ProjectActions.deletePointCloud(pointCloudId);
+  }
+
+  /**
+   * Syncs visibility of all measurement and annotation layers for a point cloud
+   * from Redux to Potree scene (measurements and annotations).
+   */
+  static setPointCloudLayersVisibility(pointCloudId: string, visible: boolean): void {
+    if (!window.viewer?.scene) return;
+
+    const projectState = ProjectActions.getProjectState();
+    const metadataPc = projectState.project?.metadata?.pointCloud?.find(
+      (p) => p.id === pointCloudId
+    );
+    if (!metadataPc?.layers) return;
+
+    for (const layer of metadataPc.layers) {
+      if (layer.type === "measurement") {
+        const measure = window.viewer.scene.measurements.find(
+          (m: any) => m.uuid === layer.id
+        );
+        if (measure) measure.visible = visible;
+      }
+      if (layer.type === "annotation") {
+        const ann = window.viewer.scene.annotations?.children?.find(
+          (a: any) => a.uuid === layer.id
+        );
+        if (ann) ann.visible = visible;
       }
     }
   }
@@ -253,15 +284,9 @@ class PotreeService {
         traverse: (fn: (a: any) => void) => void;
         remove: (annotation: any) => void;
       };
-      let found: any = null;
-      root.traverse((a: any) => {
-        if (a.uuid === annotationId || (a.id != null && String(a.id) === String(annotationId))) {
-          found = a;
-        }
-      });
-      if (found && found.parent && typeof found.parent.remove === "function") {
-        found.parent.remove(found);
-      }
+      const annotations = window.viewer.scene.annotations.children ?? [];
+      const existAnnotation = annotations.find((a: any) => a.uuid === annotationId);
+      if (existAnnotation) root.remove(existAnnotation);
     } catch (error) {
       console.error("PotreeService.removeAnnotation:", error);
     }

@@ -1,6 +1,14 @@
 import IProjectState from "../../models/IProjectState";
 import store from "../store";
-import { ProjectXML, PointCloud, Mesh, Orthophoto, MeasurementLayer, AnnotationLayer } from "../../types/ProjectTypes";
+import {
+  ProjectXML,
+  PointCloud,
+  Mesh,
+  Orthophoto,
+  Raster,
+  MeasurementLayer,
+  AnnotationLayer,
+} from "../../types/ProjectTypes";
 
 class ProjectActions {
   static getProjectState(): IProjectState {
@@ -21,7 +29,10 @@ class ProjectActions {
     });
   }
 
-  static setProjectPaths(projectFilePath: string | null, projectFolderPath: string | null) {
+  static setProjectPaths(
+    projectFilePath: string | null,
+    projectFolderPath: string | null,
+  ) {
     store.dispatch({
       type: "PROJECT/SET_PROJECT_PATHS",
       payload: { projectFilePath, projectFolderPath },
@@ -61,16 +72,24 @@ class ProjectActions {
 
     // Check if point cloud with same ID or same path already exists
     const existingPointClouds = currentState.project.metadata.pointCloud || [];
-    const existsById = existingPointClouds.some((pc) => pc.id === pointCloud.id);
-    const existsByPath = existingPointClouds.some((pc) => pc.path === pointCloud.path);
-    
+    const existsById = existingPointClouds.some(
+      (pc) => pc.id === pointCloud.id,
+    );
+    const existsByPath = existingPointClouds.some(
+      (pc) => pc.path === pointCloud.path,
+    );
+
     if (existsById) {
-      console.warn(`Point cloud with ID ${pointCloud.id} already exists, skipping add`);
+      console.warn(
+        `Point cloud with ID ${pointCloud.id} already exists, skipping add`,
+      );
       return;
     }
 
     if (existsByPath) {
-      console.warn(`Point cloud with path ${pointCloud.path} already exists, skipping add`);
+      console.warn(
+        `Point cloud with path ${pointCloud.path} already exists, skipping add`,
+      );
       return;
     }
 
@@ -84,10 +103,7 @@ class ProjectActions {
       ...currentState.project,
       metadata: {
         ...currentState.project.metadata,
-        pointCloud: [
-          ...existingPointClouds,
-          pointCloudWithVisible,
-        ],
+        pointCloud: [...existingPointClouds, pointCloudWithVisible],
       },
     };
 
@@ -115,6 +131,10 @@ class ProjectActions {
         return {
           ...pc,
           visible: visible,
+          layers: pc.layers?.map((layer) => ({
+            ...layer,
+            visible: visible,
+          })),
         };
       }
       return pc;
@@ -146,7 +166,9 @@ class ProjectActions {
     }
 
     const existingPointClouds = currentState.project.metadata.pointCloud || [];
-    const updatedPointClouds = existingPointClouds.filter((pc) => pc.id !== pointCloudId);
+    const updatedPointClouds = existingPointClouds.filter(
+      (pc) => pc.id !== pointCloudId,
+    );
 
     const updatedProject: ProjectXML = {
       ...currentState.project,
@@ -174,34 +196,50 @@ class ProjectActions {
     }
 
     // Skip if DTM has no ID or empty ID
-    if (!dtm.id || dtm.id.trim() === '') {
+    if (!dtm.id || dtm.id.trim() === "") {
       console.warn("Cannot add DTM: DTM has no ID or empty ID");
       return;
     }
 
     // Check if DTM with same ID, path, or asset already exists
     const existingDTMs = currentState.project.metadata.dtm || [];
-    
+
     // Normalize paths for comparison
     const normalizePath = (path: string | undefined | null): string => {
-      if (!path) return '';
-      return path.replace(/\\/g, '/').toLowerCase().trim();
+      if (!path) return "";
+      return path.replace(/\\/g, "/").toLowerCase().trim();
     };
-    
+
     const normalizedNewPath = normalizePath(dtm.path);
     const normalizedNewAsset = normalizePath(dtm.asset);
-    
+
     // Check for duplicates - more comprehensive check
-    const existsById = existingDTMs.some((d) => d.id && d.id.trim() !== '' && d.id === dtm.id);
-    const existsByPath = normalizedNewPath && normalizedNewPath !== '' && existingDTMs.some((d) => {
-      const normalizedExistingPath = normalizePath(d.path);
-      return normalizedExistingPath && normalizedExistingPath !== '' && normalizedExistingPath === normalizedNewPath;
-    });
-    const existsByAsset = normalizedNewAsset && normalizedNewAsset !== '' && existingDTMs.some((d) => {
-      const normalizedExistingAsset = normalizePath(d.asset);
-      return normalizedExistingAsset && normalizedExistingAsset !== '' && normalizedExistingAsset === normalizedNewAsset;
-    });
-    
+    const existsById = existingDTMs.some(
+      (d) => d.id && d.id.trim() !== "" && d.id === dtm.id,
+    );
+    const existsByPath =
+      normalizedNewPath &&
+      normalizedNewPath !== "" &&
+      existingDTMs.some((d) => {
+        const normalizedExistingPath = normalizePath(d.path);
+        return (
+          normalizedExistingPath &&
+          normalizedExistingPath !== "" &&
+          normalizedExistingPath === normalizedNewPath
+        );
+      });
+    const existsByAsset =
+      normalizedNewAsset &&
+      normalizedNewAsset !== "" &&
+      existingDTMs.some((d) => {
+        const normalizedExistingAsset = normalizePath(d.asset);
+        return (
+          normalizedExistingAsset &&
+          normalizedExistingAsset !== "" &&
+          normalizedExistingAsset === normalizedNewAsset
+        );
+      });
+
     if (existsById) {
       console.warn(`DTM with ID ${dtm.id} already exists, skipping add`);
       return;
@@ -221,10 +259,7 @@ class ProjectActions {
       ...currentState.project,
       metadata: {
         ...currentState.project.metadata,
-        dtm: [
-          ...existingDTMs,
-          dtm,
-        ],
+        dtm: [...existingDTMs, dtm],
       },
     };
 
@@ -246,34 +281,50 @@ class ProjectActions {
     }
 
     // Skip if DSM has no ID or empty ID
-    if (!dsm.id || dsm.id.trim() === '') {
+    if (!dsm.id || dsm.id.trim() === "") {
       console.warn("Cannot add DSM: DSM has no ID or empty ID");
       return;
     }
 
     // Check if DSM with same ID, path, or asset already exists
     const existingDSMs = currentState.project.metadata.dsm || [];
-    
+
     // Normalize paths for comparison
     const normalizePath = (path: string | undefined | null): string => {
-      if (!path) return '';
-      return path.replace(/\\/g, '/').toLowerCase().trim();
+      if (!path) return "";
+      return path.replace(/\\/g, "/").toLowerCase().trim();
     };
-    
+
     const normalizedNewPath = normalizePath(dsm.path);
     const normalizedNewAsset = normalizePath(dsm.asset);
-    
+
     // Check for duplicates - more comprehensive check
-    const existsById = existingDSMs.some((d) => d.id && d.id.trim() !== '' && d.id === dsm.id);
-    const existsByPath = normalizedNewPath && normalizedNewPath !== '' && existingDSMs.some((d) => {
-      const normalizedExistingPath = normalizePath(d.path);
-      return normalizedExistingPath && normalizedExistingPath !== '' && normalizedExistingPath === normalizedNewPath;
-    });
-    const existsByAsset = normalizedNewAsset && normalizedNewAsset !== '' && existingDSMs.some((d) => {
-      const normalizedExistingAsset = normalizePath(d.asset);
-      return normalizedExistingAsset && normalizedExistingAsset !== '' && normalizedExistingAsset === normalizedNewAsset;
-    });
-    
+    const existsById = existingDSMs.some(
+      (d) => d.id && d.id.trim() !== "" && d.id === dsm.id,
+    );
+    const existsByPath =
+      normalizedNewPath &&
+      normalizedNewPath !== "" &&
+      existingDSMs.some((d) => {
+        const normalizedExistingPath = normalizePath(d.path);
+        return (
+          normalizedExistingPath &&
+          normalizedExistingPath !== "" &&
+          normalizedExistingPath === normalizedNewPath
+        );
+      });
+    const existsByAsset =
+      normalizedNewAsset &&
+      normalizedNewAsset !== "" &&
+      existingDSMs.some((d) => {
+        const normalizedExistingAsset = normalizePath(d.asset);
+        return (
+          normalizedExistingAsset &&
+          normalizedExistingAsset !== "" &&
+          normalizedExistingAsset === normalizedNewAsset
+        );
+      });
+
     if (existsById) {
       console.warn(`DSM with ID ${dsm.id} already exists, skipping add`);
       return;
@@ -293,10 +344,7 @@ class ProjectActions {
       ...currentState.project,
       metadata: {
         ...currentState.project.metadata,
-        dsm: [
-          ...existingDSMs,
-          dsm,
-        ],
+        dsm: [...existingDSMs, dsm],
       },
     };
 
@@ -319,39 +367,49 @@ class ProjectActions {
 
     // Check if orthophoto with same ID, path, or asset already exists
     const existingOrthophotos = currentState.project.metadata.orthophoto || [];
-    
+
     // Normalize paths for comparison
     const normalizePath = (path: string | undefined | null): string => {
-      if (!path) return '';
-      return path.replace(/\\/g, '/').toLowerCase().trim();
+      if (!path) return "";
+      return path.replace(/\\/g, "/").toLowerCase().trim();
     };
-    
+
     const normalizedNewPath = normalizePath(orthophoto.path);
     const normalizedNewAsset = normalizePath(orthophoto.asset);
-    
+
     // Check for duplicates
     const existsById = existingOrthophotos.some((o) => o.id === orthophoto.id);
-    const existsByPath = normalizedNewPath && existingOrthophotos.some((o) => {
-      const normalizedExistingPath = normalizePath(o.path);
-      return normalizedExistingPath === normalizedNewPath;
-    });
-    const existsByAsset = normalizedNewAsset && existingOrthophotos.some((o) => {
-      const normalizedExistingAsset = normalizePath(o.asset);
-      return normalizedExistingAsset === normalizedNewAsset;
-    });
-    
+    const existsByPath =
+      normalizedNewPath &&
+      existingOrthophotos.some((o) => {
+        const normalizedExistingPath = normalizePath(o.path);
+        return normalizedExistingPath === normalizedNewPath;
+      });
+    const existsByAsset =
+      normalizedNewAsset &&
+      existingOrthophotos.some((o) => {
+        const normalizedExistingAsset = normalizePath(o.asset);
+        return normalizedExistingAsset === normalizedNewAsset;
+      });
+
     if (existsById) {
-      console.warn(`Orthophoto with ID ${orthophoto.id} already exists, skipping add`);
+      console.warn(
+        `Orthophoto with ID ${orthophoto.id} already exists, skipping add`,
+      );
       return;
     }
 
     if (existsByPath) {
-      console.warn(`Orthophoto with path ${orthophoto.path} already exists, skipping add`);
+      console.warn(
+        `Orthophoto with path ${orthophoto.path} already exists, skipping add`,
+      );
       return;
     }
 
     if (existsByAsset) {
-      console.warn(`Orthophoto with asset ${orthophoto.asset} already exists, skipping add`);
+      console.warn(
+        `Orthophoto with asset ${orthophoto.asset} already exists, skipping add`,
+      );
       return;
     }
 
@@ -359,10 +417,47 @@ class ProjectActions {
       ...currentState.project,
       metadata: {
         ...currentState.project.metadata,
-        orthophoto: [
-          ...existingOrthophotos,
-          orthophoto,
-        ],
+        orthophoto: [...existingOrthophotos, orthophoto],
+      },
+    };
+
+    store.dispatch({
+      type: "PROJECT/UPDATE_PROJECT",
+      payload: { project: updatedProject },
+    });
+  }
+
+  /**
+   * Add a raster to the project
+   * @param raster Raster object to add (with extent, bands, etc.)
+   */
+  static addRaster(raster: Raster) {
+    const currentState = store.getState().projectReducer;
+    if (!currentState.project) {
+      console.error("Cannot add raster: No project loaded");
+      return;
+    }
+
+    const existingRasters = currentState.project.metadata.raster || [];
+    const existsById = existingRasters.some((r) => r.id === raster.id);
+    const existsByPath = existingRasters.some(
+      (r) => r.path?.replace(/\\/g, "/").toLowerCase() === raster.path?.replace(/\\/g, "/").toLowerCase()
+    );
+
+    if (existsById) {
+      console.warn(`Raster with ID ${raster.id} already exists, skipping add`);
+      return;
+    }
+    if (existsByPath) {
+      console.warn(`Raster with path ${raster.path} already exists, skipping add`);
+      return;
+    }
+
+    const updatedProject: ProjectXML = {
+      ...currentState.project,
+      metadata: {
+        ...currentState.project.metadata,
+        raster: [...existingRasters, raster],
       },
     };
 
@@ -386,7 +481,7 @@ class ProjectActions {
     // Check if mesh with same ID already exists
     const existingMeshes = currentState.project.metadata.mesh || [];
     const exists = existingMeshes.some((m) => m.id === mesh.id);
-    
+
     if (exists) {
       console.warn(`Mesh with ID ${mesh.id} already exists, skipping add`);
       return;
@@ -396,10 +491,7 @@ class ProjectActions {
       ...currentState.project,
       metadata: {
         ...currentState.project.metadata,
-        mesh: [
-          ...existingMeshes,
-          mesh,
-        ],
+        mesh: [...existingMeshes, mesh],
       },
     };
 
@@ -414,7 +506,10 @@ class ProjectActions {
    * @param pointCloudId The ID of the point cloud
    * @param measurementLayer The measurement layer to add
    */
-  static addMeasurementLayer(pointCloudId: string, measurementLayer: MeasurementLayer) {
+  static addMeasurementLayer(
+    pointCloudId: string,
+    measurementLayer: MeasurementLayer,
+  ) {
     const currentState = store.getState().projectReducer;
     if (!currentState.project) {
       console.error("Cannot add measurement layer: No project loaded");
@@ -422,10 +517,14 @@ class ProjectActions {
     }
 
     const existingPointClouds = currentState.project.metadata.pointCloud || [];
-    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+    const pointCloudIndex = existingPointClouds.findIndex(
+      (pc) => pc.id === pointCloudId,
+    );
 
     if (pointCloudIndex === -1) {
-      console.error(`Cannot add measurement layer: Point cloud with ID ${pointCloudId} not found`);
+      console.error(
+        `Cannot add measurement layer: Point cloud with ID ${pointCloudId} not found`,
+      );
       return;
     }
 
@@ -433,9 +532,13 @@ class ProjectActions {
     const existingLayers = pointCloud.layers || [];
 
     // Check if layer with same ID already exists
-    const existsById = existingLayers.some((layer) => layer.id === measurementLayer.id);
+    const existsById = existingLayers.some(
+      (layer) => layer.id === measurementLayer.id,
+    );
     if (existsById) {
-      console.warn(`Measurement layer with ID ${measurementLayer.id} already exists, skipping add`);
+      console.warn(
+        `Measurement layer with ID ${measurementLayer.id} already exists, skipping add`,
+      );
       return;
     }
 
@@ -466,7 +569,10 @@ class ProjectActions {
    * @param pointCloudId The ID of the point cloud (modelData.id)
    * @param annotationLayer The annotation layer to add
    */
-  static addAnnotationLayer(pointCloudId: string, annotationLayer: AnnotationLayer) {
+  static addAnnotationLayer(
+    pointCloudId: string,
+    annotationLayer: AnnotationLayer,
+  ) {
     const currentState = store.getState().projectReducer;
     if (!currentState.project) {
       console.error("Cannot add annotation layer: No project loaded");
@@ -474,19 +580,27 @@ class ProjectActions {
     }
 
     const existingPointClouds = currentState.project.metadata.pointCloud || [];
-    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+    const pointCloudIndex = existingPointClouds.findIndex(
+      (pc) => pc.id === pointCloudId,
+    );
 
     if (pointCloudIndex === -1) {
-      console.error(`Cannot add annotation layer: Point cloud with ID ${pointCloudId} not found`);
+      console.error(
+        `Cannot add annotation layer: Point cloud with ID ${pointCloudId} not found`,
+      );
       return;
     }
 
     const pointCloud = existingPointClouds[pointCloudIndex];
     const existingLayers = pointCloud.layers || [];
 
-    const existsById = existingLayers.some((layer) => layer.id === annotationLayer.id);
+    const existsById = existingLayers.some(
+      (layer) => layer.id === annotationLayer.id,
+    );
     if (existsById) {
-      console.warn(`Annotation layer with ID ${annotationLayer.id} already exists, skipping add`);
+      console.warn(
+        `Annotation layer with ID ${annotationLayer.id} already exists, skipping add`,
+      );
       return;
     }
 
@@ -525,16 +639,22 @@ class ProjectActions {
     }
 
     const existingPointClouds = currentState.project.metadata.pointCloud || [];
-    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+    const pointCloudIndex = existingPointClouds.findIndex(
+      (pc) => pc.id === pointCloudId,
+    );
 
     if (pointCloudIndex === -1) {
-      console.error(`Cannot remove annotation layer: Point cloud with ID ${pointCloudId} not found`);
+      console.error(
+        `Cannot remove annotation layer: Point cloud with ID ${pointCloudId} not found`,
+      );
       return;
     }
 
     const pointCloud = existingPointClouds[pointCloudIndex];
     const existingLayers = pointCloud.layers || [];
-    const updatedLayers = existingLayers.filter((layer) => layer.id !== layerId);
+    const updatedLayers = existingLayers.filter(
+      (layer) => layer.id !== layerId,
+    );
 
     const updatedPointCloud = {
       ...pointCloud,
@@ -567,19 +687,25 @@ class ProjectActions {
   static updateAnnotationLayerVisibility(
     pointCloudId: string,
     layerId: string,
-    visible: boolean
+    visible: boolean,
   ) {
     const currentState = store.getState().projectReducer;
     if (!currentState.project) {
-      console.error("Cannot update annotation layer visibility: No project loaded");
+      console.error(
+        "Cannot update annotation layer visibility: No project loaded",
+      );
       return;
     }
 
     const existingPointClouds = currentState.project.metadata.pointCloud || [];
-    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+    const pointCloudIndex = existingPointClouds.findIndex(
+      (pc) => pc.id === pointCloudId,
+    );
 
     if (pointCloudIndex === -1) {
-      console.error(`Cannot update annotation layer: Point cloud with ID ${pointCloudId} not found`);
+      console.error(
+        `Cannot update annotation layer: Point cloud with ID ${pointCloudId} not found`,
+      );
       return;
     }
 
@@ -623,19 +749,25 @@ class ProjectActions {
   static updateMeasurementLayerVisibility(
     pointCloudId: string,
     layerId: string,
-    visible: boolean
+    visible: boolean,
   ) {
     const currentState = store.getState().projectReducer;
     if (!currentState.project) {
-      console.error("Cannot update measurement layer visibility: No project loaded");
+      console.error(
+        "Cannot update measurement layer visibility: No project loaded",
+      );
       return;
     }
 
     const existingPointClouds = currentState.project.metadata.pointCloud || [];
-    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+    const pointCloudIndex = existingPointClouds.findIndex(
+      (pc) => pc.id === pointCloudId,
+    );
 
     if (pointCloudIndex === -1) {
-      console.error(`Cannot update measurement layer: Point cloud with ID ${pointCloudId} not found`);
+      console.error(
+        `Cannot update measurement layer: Point cloud with ID ${pointCloudId} not found`,
+      );
       return;
     }
 
@@ -675,7 +807,10 @@ class ProjectActions {
    * @param pointCloudId The ID of the point cloud
    * @param measurementLayer The updated measurement layer
    */
-  static updateMeasurementLayer(pointCloudId: string, measurementLayer: MeasurementLayer) {
+  static updateMeasurementLayer(
+    pointCloudId: string,
+    measurementLayer: MeasurementLayer,
+  ) {
     const currentState = store.getState().projectReducer;
     if (!currentState.project) {
       console.error("Cannot update measurement layer: No project loaded");
@@ -683,10 +818,14 @@ class ProjectActions {
     }
 
     const existingPointClouds = currentState.project.metadata.pointCloud || [];
-    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+    const pointCloudIndex = existingPointClouds.findIndex(
+      (pc) => pc.id === pointCloudId,
+    );
 
     if (pointCloudIndex === -1) {
-      console.error(`Cannot update measurement layer: Point cloud with ID ${pointCloudId} not found`);
+      console.error(
+        `Cannot update measurement layer: Point cloud with ID ${pointCloudId} not found`,
+      );
       return;
     }
 
@@ -694,9 +833,13 @@ class ProjectActions {
     const existingLayers = pointCloud.layers || [];
 
     // Check if layer exists
-    const layerIndex = existingLayers.findIndex((layer) => layer.id === measurementLayer.id);
+    const layerIndex = existingLayers.findIndex(
+      (layer) => layer.id === measurementLayer.id,
+    );
     if (layerIndex === -1) {
-      console.warn(`Measurement layer with ID ${measurementLayer.id} not found, cannot update`);
+      console.warn(
+        `Measurement layer with ID ${measurementLayer.id} not found, cannot update`,
+      );
       return;
     }
 
@@ -739,16 +882,22 @@ class ProjectActions {
     }
 
     const existingPointClouds = currentState.project.metadata.pointCloud || [];
-    const pointCloudIndex = existingPointClouds.findIndex((pc) => pc.id === pointCloudId);
+    const pointCloudIndex = existingPointClouds.findIndex(
+      (pc) => pc.id === pointCloudId,
+    );
 
     if (pointCloudIndex === -1) {
-      console.error(`Cannot remove measurement layer: Point cloud with ID ${pointCloudId} not found`);
+      console.error(
+        `Cannot remove measurement layer: Point cloud with ID ${pointCloudId} not found`,
+      );
       return;
     }
 
     const pointCloud = existingPointClouds[pointCloudIndex];
     const existingLayers = pointCloud.layers || [];
-    const updatedLayers = existingLayers.filter((layer) => layer.id !== layerId);
+    const updatedLayers = existingLayers.filter(
+      (layer) => layer.id !== layerId,
+    );
 
     const updatedPointCloud = {
       ...pointCloud,
@@ -774,4 +923,3 @@ class ProjectActions {
 }
 
 export default ProjectActions;
-

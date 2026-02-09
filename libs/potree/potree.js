@@ -66418,17 +66418,17 @@ void main() {
 	}
 
 	function loadAnnotationItem(item){
-
 		const annotation = new Annotation({
 			position: item.position,
 			title: item.title,
 			cameraPosition: item.cameraPosition,
-			cameraTarget: item.cameraTarget,
+			cameraTarget: item.cameraTarget
 		});
 
 
 		annotation.description = item.description;
 		annotation.uuid = item.uuid;
+		annotation.visible = item.visible;
 
 		if(item.offset){
 			annotation.offset.set(...item.offset);

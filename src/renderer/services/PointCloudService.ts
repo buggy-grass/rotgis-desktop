@@ -2,6 +2,7 @@ import path from "path";
 import ProjectActions from "../store/actions/ProjectActions";
 import { PointCloud } from "../types/ProjectTypes";
 import PathService from "./PathService";
+import PotreeService from "./PotreeService";
 import ShellCommandService from "./ShellCommandService";
 import WindowsAPI from "./WindowsAPI";
 import { v4 as uuid } from "uuid";
@@ -156,6 +157,7 @@ class PointCloudService {
       const result = await ShellCommandService.execute({
         command: await PathService.getPotreeConverterPath(),
         args: [shortPath, "-o", outputShortPath],
+        process: "converter"
       });
 
       if (result.success) {
@@ -340,35 +342,26 @@ class PointCloudService {
   }
 
   /**
-   * Set point cloud visibility
-   * Updates both the Potree viewer and the Redux store
+   * Set point cloud visibility.
+   * Updates Potree viewer (point cloud + its measurement/annotation layers) and Redux.
    * @param pointCloudId The ID of the point cloud
    * @param visible The visibility state
    */
   static pointCloudVisibility(pointCloudId: string, visible: boolean) {
-    if (!window.viewer) {
+    if (!window.viewer?.scene) {
       console.warn("Potree viewer not available");
       return;
     }
 
     const pointClouds = window.viewer.scene.pointclouds;
-    const existPointCloud = pointClouds.find(
-      (pointCloud: any) => pointCloud.name == pointCloudId
+    const pc = pointClouds.find(
+      (p: any) => p.name === pointCloudId
     );
-  
-    if (existPointCloud) {
-      // Dronet projesindeki gibi direkt _visible set et
-      // Potree.js'te visible getter/setter var:
-      // - getter: return this._visible
-      // - setter: this._visible = value; dispatchEvent('visibility_changed')
-      // Render'da: visiblePointClouds.filter(pc => pc.visible) kullanılıyor
-      // PotreeViewer.tsx'te de visible setter kullanılıyor, tutarlılık için burada da kullanalım
-      existPointCloud._visible = visible; // Potree'nin setter'ını kullan (event dispatch ediyor)
-      
-      // Redux store'u güncelle
+
+    if (pc) {
+      pc._visible = visible;
       ProjectActions.updatePointCloudVisibility(pointCloudId, visible);
-      
-      console.log(`Point cloud ${pointCloudId} visibility set to ${visible} (Potree._visible: ${existPointCloud._visible})`);
+      PotreeService.setPointCloudLayersVisibility(pointCloudId, visible);
     } else {
       console.warn(`Point cloud ${pointCloudId} not found in viewer`);
     }

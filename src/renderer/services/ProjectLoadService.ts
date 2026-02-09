@@ -175,6 +175,9 @@ export async function openProject(): Promise<void> {
     // Update store
     ProjectActions.setProject(project);
     ProjectActions.setProjectPaths(projectFilePath, projectFolderPath);
+    if (typeof window !== "undefined" && window.electronAPI?.setRasterServerPath) {
+      window.electronAPI.setRasterServerPath(projectFolderPath);
+    }
     ProjectActions.setDirty(false);
 
   } catch (error) {

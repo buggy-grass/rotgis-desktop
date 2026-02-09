@@ -161,6 +161,9 @@ function RibbonMenu() {
       // Update project in store
       ProjectActions.updateProject(currentProject);
       ProjectActions.setProjectPaths(result.projectFile, result.projectFolder);
+      if (window.electronAPI?.setRasterServerPath) {
+        window.electronAPI.setRasterServerPath(result.projectFolder ?? null);
+      }
       ProjectActions.setDirty(false);
     } catch (error) {
       console.error('Error saving project:', error);

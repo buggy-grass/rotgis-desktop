@@ -78,6 +78,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     args?: string[];
     cwd?: string;
     env?: Record<string, string>;
+    captureOutput?: boolean;
   }) => {
     return ipcRenderer.invoke('execute-command', options);
   },
@@ -99,6 +100,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   copyFile: (sourcePath: string, destinationPath: string) => {
     return ipcRenderer.invoke('copy-file', sourcePath, destinationPath);
+  },
+  // Raster local server (COG files via HTTP with Range support)
+  getRasterServerPort: () => ipcRenderer.invoke("get-raster-server-port") as Promise<number>,
+  setRasterServerPath: (projectPath: string | null) => {
+    ipcRenderer.send("set-raster-server-path", projectPath);
   },
   // Path utilities
   pathJoin: (...paths: string[]) => {

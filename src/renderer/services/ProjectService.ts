@@ -29,6 +29,7 @@ export function getDefaultProjectTemplate(): ProjectXML {
       mesh: [],
       pointCloud: [],
       orthophoto: [],
+      raster: [],
       dsm: [],
       dtm: [],
     },

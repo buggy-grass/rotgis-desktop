@@ -121,10 +121,40 @@ export interface Orthophoto {
   import: boolean;
 }
 
+/** Band info from GDAL (gdalinfo -json) */
+export interface RasterBandInfo {
+  band: number;
+  type?: string;
+  block?: number[];
+}
+
+export interface Raster {
+  id: string;
+  name: string;
+  fileType: "raster";
+  extension: string;
+  asset: string;
+  path: string;
+  bbox: BBox;
+  center: Center;
+  epsg: string;
+  epsgText: string;
+  proj4: string;
+  width: number;
+  height: number;
+  bands: RasterBandInfo[];
+  import: boolean;
+  /** COG output path relative to project (if converted) */
+  cogPath?: string;
+  /** WGS84 extent from gdalinfo (for map zoom); coordinates[0] = polygon ring [lon,lat][] */
+  wgs84Extent?: { type: string; coordinates: number[][][] };
+}
+
 export interface Metadata {
   mesh: Mesh[];
   pointCloud: PointCloud[];
   orthophoto: Orthophoto[];
+  raster: Raster[];
   dsm: Orthophoto[];
   dtm: Orthophoto[];
 }

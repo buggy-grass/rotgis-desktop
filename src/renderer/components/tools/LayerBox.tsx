@@ -39,6 +39,7 @@ import {
   PointCloud,
   Mesh,
   Orthophoto,
+  Raster,
   MeasurementLayer,
   AnnotationLayer,
 } from "../../types/ProjectTypes";
@@ -50,8 +51,8 @@ interface Layer {
   id: string;
   name: string;
   visible: boolean;
-  type: "point-cloud" | "mesh" | "orthophoto" | "dsm" | "dtm" | "measurement" | "annotation";
-  data?: PointCloud | Mesh | Orthophoto | MeasurementLayer | AnnotationLayer;
+  type: "point-cloud" | "mesh" | "orthophoto" | "dsm" | "dtm" | "raster" | "measurement" | "annotation";
+  data?: PointCloud | Mesh | Orthophoto | Raster | MeasurementLayer | AnnotationLayer;
   children?: Layer[];
 }
 
@@ -119,7 +120,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
 
   // Convert project metadata to Layer structure
   const layers = useMemo<Layer[]>(() => {
-    const { mesh, orthophoto, dsm, dtm } = project?.metadata || {};
+    const { mesh, orthophoto, raster, dsm, dtm } = project?.metadata || {};
 
     const layersArray: Layer[] = [];
 
@@ -212,20 +213,35 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         ...dtm.map((d) => ({
           id: d.id,
           name: d.name,
-          visible: true, // Default to true for other layer types
+          visible: true,
           type: "dtm" as const,
           data: d,
         }))
       );
     }
 
-    // Always show Vector Layer, even if empty
     layersArray.push({
       id: "vector-parent",
       name: "Vector Layer",
-      visible: true, // Parent layers are always visible
+      visible: true,
       type: "orthophoto",
       children: vectorChildren,
+    });
+
+    // Raster Layer
+    const rasterChildren: Layer[] = (raster || []).map((r) => ({
+      id: r.id,
+      name: `${r.name}${r.extension}`,
+      visible: true,
+      type: "raster" as const,
+      data: r,
+    }));
+    layersArray.push({
+      id: "raster-parent",
+      name: "Raster Layer",
+      visible: true,
+      type: "raster",
+      children: rasterChildren,
     });
 
     return layersArray;
@@ -238,7 +254,8 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
       const isPointCloudRow =
         item.type === "point-cloud" &&
         item.id !== "point-cloud-parent" &&
-        item.id !== "vector-parent";
+        item.id !== "vector-parent" &&
+        item.id !== "raster-parent";
       if (isPointCloudRow || (item.children && item.children.length > 0)) {
         ids.push(item.id);
         // Nokta bulutu altındaki Measurements ve Annotation accordion'ları da açılsın
@@ -366,6 +383,15 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
           layerId,
           !currentVisible
         );
+
+        if (window.viewer && window.viewer.scene) {
+          const annotation = window.viewer.scene.annotations.children.find(
+            (m: any) => m.uuid === layerId
+          );
+          if (annotation) {
+            annotation.visible = !currentVisible;
+          }
+        }
       }
     } else {
       // For other layer types, use local state (if needed in future)
@@ -418,7 +444,8 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
     const isPointCloudRow =
       layer.type === "point-cloud" &&
       layer.id !== "point-cloud-parent" &&
-      layer.id !== "vector-parent";
+      layer.id !== "vector-parent" &&
+      layer.id !== "raster-parent";
     // Nokta bulutu satırları her zaman açılabilir (Measurements/Annotation sekmeleri)
     const hasExpandableContent = isPointCloudRow || hasChildren;
     // For point clouds, get visibility from Redux; for measurements/annotations, get from data
@@ -429,6 +456,8 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         ? (layer.data as MeasurementLayer).visible
         : layer.type === "annotation" && layer.data
         ? (layer.data as AnnotationLayer).visible
+        : layer.type === "raster"
+        ? true
         : true;
 
     // Get point cloud ID for measurement/annotation layers
@@ -536,7 +565,8 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                     >
                       {layer.id != "mesh-parent" &&
                         layer.id != "point-cloud-parent" &&
-                        layer.id != "vector-parent" && (
+                        layer.id != "vector-parent" &&
+                        layer.id != "raster-parent" && (
                           <>
                             <div
                               className="h-7 w-7 p-1.5 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer"
@@ -554,8 +584,8 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                                 <EyeOff className="h-3 w-3 text-muted-foreground" />
                               )}
                             </div>
-                            {/* Show focus button for point clouds and meshes even if they have children */}
-                            {(layer.type === "point-cloud" || layer.type === "mesh") && (
+                            {/* Show focus button for point clouds, meshes, and rasters */}
+                            {(layer.type === "point-cloud" || layer.type === "mesh" || layer.type === "raster") && (
                               <div
                                 className="h-7 w-7 p-1.5 flex items-center justify-center rounded-sm hover:bg-accent cursor-pointer"
                                 onClick={(e) => {
@@ -575,7 +605,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                 </AccordionTrigger>
               </ContextMenuTrigger>
               {/* Context menu only for point-cloud layers, not for parent layers */}
-              {layer.type === "point-cloud" && layer.id !== "point-cloud-parent" && layer.id !== "mesh-parent" && layer.id !== "vector-parent" && (
+              {layer.type === "point-cloud" && layer.id !== "point-cloud-parent" && layer.id !== "mesh-parent" && layer.id !== "vector-parent" && layer.id !== "raster-parent" && (
                 <ContextMenuContent>
                   <ContextMenuItem
                     onClick={handleShowProperties}
@@ -687,6 +717,18 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         } else if (layer.type === "annotation" && layer.data) {
           const annotationLayer = layer.data as AnnotationLayer;
           PotreeService.focusToMeasure(annotationLayer.extent);
+        } else if (layer.type === "raster" && layer.data && window.eventBus) {
+          const r = layer.data as Raster;
+          const ring = r.wgs84Extent?.coordinates?.[0];
+          if (ring?.length) {
+            let minLon = ring[0][0], minLat = ring[0][1], maxLon = ring[0][0], maxLat = ring[0][1];
+            for (let i = 1; i < ring.length; i++) {
+              const [lon, lat] = ring[i];
+              if (lon < minLon) minLon = lon; if (lat < minLat) minLat = lat;
+              if (lon > maxLon) maxLon = lon; if (lat > maxLat) maxLat = lat;
+            }
+            window.eventBus.emit("openlayers:fitExtent", { extent: [minLon, minLat, maxLon, maxLat] });
+          }
         }
       };
 
@@ -728,12 +770,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
 
         if (layer.type === "point-cloud" && layer.data) {
           const pc = layer.data as PointCloud;
-
-          // Remove from Potree viewer
           PotreeService.deletePointCloud(pc.id);
-
-          // Remove from Redux store
-          ProjectActions.deletePointCloud(pc.id);
         } else if (layer.type === "measurement" && layer.data && pointCloudId) {
           const measurementLayer = layer.data as MeasurementLayer;
 
@@ -806,7 +843,8 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
 
               {layer.id != "mesh-parent" &&
                 layer.id != "point-cloud-parent" &&
-                layer.id != "vector-parent" && (
+                layer.id != "vector-parent" &&
+                layer.id != "raster-parent" && (
                   <div
                     className="flex items-center"
                     onClick={(e) => e.stopPropagation()}
@@ -844,9 +882,10 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
                         />
                       )}
                     </div>
-                    {/* Show focus button for point clouds, meshes, measurements, annotations */}
+                    {/* Show focus button for point clouds, meshes, rasters, measurements, annotations */}
                     {(layer.type === "point-cloud" ||
                       layer.type === "mesh" ||
+                      layer.type === "raster" ||
                       layer.type === "measurement" ||
                       layer.type === "annotation") && (
                       <div
