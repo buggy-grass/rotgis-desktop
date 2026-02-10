@@ -40,6 +40,7 @@ import LayerBox, { LayersRef } from "./LayerBox";
 import AddLayerDialog from "../dialogs/AddLayerDialog";
 import PointCloudService from "../../services/PointCloudService";
 import MeshService from "../../services/MeshService";
+import RasterService from "../../services/RasterService";
 
 const useStyles = makeUseStyles({
   container: {
@@ -111,7 +112,7 @@ function Toolbox() {
     }
   }, [activeTab]);
 
-  const handleImportLayer = async (layerType: "point-cloud" | "mesh" | "vector", filePath: string) => {
+  const handleImportLayer = async (layerType: "point-cloud" | "mesh" | "vector" | "raster", filePath: string) => {
     console.log("Importing layer:", layerType, filePath);
     try {
      switch (layerType) {
@@ -121,6 +122,9 @@ function Toolbox() {
         case "mesh":
         await MeshService.import(filePath);
         break;
+        case "raster":
+          await RasterService.import(filePath);
+          break;
         case "vector":
         
         break;

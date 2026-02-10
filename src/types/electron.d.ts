@@ -34,16 +34,29 @@ export interface ElectronAPI {
     args?: string[];
     cwd?: string;
     env?: Record<string, string>;
-  }) => Promise<{ success: boolean; exitCode: number; error?: string }>;
+    /** When true, returns { stdout, stderr } instead of streaming */
+    captureOutput?: boolean;
+  }) => Promise<
+    | { success: boolean; exitCode: number; error?: string }
+    | { success: boolean; exitCode: number; stdout: string; stderr: string }
+  >;
   onCommandStdout: (callback: (line: string) => void) => void;
   onCommandStderr: (callback: (line: string) => void) => void;
   removeCommandListeners: () => void;
   directoryExists: (dirPath: string) => Promise<boolean>;
   getFileSize: (filePath: string) => Promise<number>;
   copyFile: (sourcePath: string, destinationPath: string) => Promise<void>;
+  getRasterServerPort: () => Promise<number>;
+  setRasterServerPath: (projectPath: string | null) => void;
   pathJoin: (...paths: string[]) => string;
   pathDirname: (filePath: string) => string;
   pathBasename: (filePath: string) => string;
+  database: {
+    get: (sql: string, params?: unknown[]) => Promise<unknown>;
+    all: (sql: string, params?: unknown[]) => Promise<unknown[]>;
+    run: (sql: string, params?: unknown[]) => Promise<{ changes: number; lastInsertRowid: number | bigint }>;
+    exec: (sql: string) => Promise<void>;
+  };
 }
 
 declare global {

@@ -396,11 +396,8 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       const pointCloudMetadata =
         projectState.project?.metadata?.pointCloud?.find((pc) => pc.id === id);
       if (pointCloudMetadata) {
-        const shouldBeVisible = pointCloudMetadata.visible !== false; // Default to true
+        const shouldBeVisible = pointCloudMetadata.visible !== false;
         e.pointcloud._visible = shouldBeVisible;
-        console.log(
-          `Point cloud ${id} loaded with visibility: ${shouldBeVisible}`
-        );
       }
 
       // Don't auto-zoom when loading - let user focus manually via LayerBox
@@ -960,7 +957,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
     };
   }, [window.viewer, isPotreeReady, project?.metadata?.pointCloud, pointCloudData?.id]);
 
-  // Load point clouds from project metadata when store updates
+  // --- Point clouds & layers: load from project metadata; layers only for point clouds that are actually in the viewer ---
   useEffect(() => {
     if (!window.viewer || !isPotreeReady || !project?.metadata?.pointCloud) {
       return;
@@ -1032,9 +1029,9 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
             firstLoadedId = pc.id;
           }
         } catch (error) {
-          console.warn(
-            `Point cloud asset not found, skipping load: ${pointCloudPath}`
-          );
+          // console.warn(
+          //   `Point cloud asset not found, skipping load: ${pointCloudPath}`
+          // );
           // Asset doesn't exist, skip loading
           // Note: Invalid assets are already filtered in loadProject
         }
@@ -1057,9 +1054,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       }
 
       if (focusId) {
-        // Wait a bit for the point cloud to be fully loaded in Potree
         setTimeout(() => {
-          console.log(`Focusing on point cloud: ${focusId}`);
           lookingModel.current = "point-cloud";
           PotreeService.focusToPointCloud(focusId!);
           // Track the focused point cloud as active (PotreeService also sets global variable)
@@ -1080,16 +1075,21 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       }, 1000); // Wait for point clouds to be fully loaded
     };
 
-    // Load measurement layers from project metadata (her zaman Redux'tan oku - closure eski kalmasın)
+    /** Load measurement layers from Redux only for point clouds currently in the viewer (avoids orphan annotations/measurements). */
     const loadMeasurementLayers = () => {
-      if (!window.viewer || !window.viewer.scene) return;
+      if (!window.viewer?.scene) return;
 
-      // Set flag to prevent event listener from adding measurements during loading
+      const loadedPointCloudIds = new Set(
+        window.viewer.scene.pointclouds.map((p: any) => p.name)
+      );
+      if (loadedPointCloudIds.size === 0) return;
+
       isLoadingMeasurementsRef.current = true;
-
       try {
         const currentProject = ProjectActions.getProjectState().project;
-        const pointClouds = currentProject?.metadata?.pointCloud || [];
+        const pointClouds = (currentProject?.metadata?.pointCloud || []).filter(
+          (pc) => loadedPointCloudIds.has(pc.id)
+        );
 
         // Collect all measurements from all point clouds
         const allMeasurements: any[] = [];
@@ -1130,11 +1130,12 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
                     ],
                   ];
 
+            const parentVisible = pc.visible !== false;
             const measurementData = {
               uuid: layer.id,
               name: layer.name,
               points: points,
-              visible: layer.visible !== false,
+              visible: parentVisible && (layer.visible !== false),
               showDistances:
                 layer.showDistances ??
                 (layer.measurementType === "line" ||
@@ -1244,19 +1245,27 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       }
     };
 
-    // Load annotation layers from project metadata (Potree loadAnnotations ile; measurement olarak değil)
+    /** Load annotation layers from Redux only for point clouds currently in the viewer. */
     const loadAnnotationLayers = () => {
       if (!window.viewer?.scene) return;
       const loadAnnotationsFn = (window as any).Potree?.loadAnnotations;
       if (typeof loadAnnotationsFn !== "function") return;
 
+      const loadedPointCloudIds = new Set(
+        window.viewer.scene.pointclouds.map((p: any) => p.name)
+      );
+      if (loadedPointCloudIds.size === 0) return;
+
       const currentProject = ProjectActions.getProjectState().project;
-      const pointClouds = currentProject?.metadata?.pointCloud || [];
+      const pointClouds = (currentProject?.metadata?.pointCloud || []).filter(
+        (pc) => loadedPointCloudIds.has(pc.id)
+      );
       const allAnnotations: Array<{
         position: number[];
         title: string;
         description: string;
         uuid: string;
+        visible: boolean;
         offset?: number[];
         children?: unknown[];
       }> = [];
@@ -1268,12 +1277,14 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
           (layer) => layer.type === "annotation"
         );
 
+        const parentVisible = pc.visible !== false;
         for (const layer of annotationLayers) {
-          const ann = layer as { position: [number, number, number]; title: string; content?: string; id: string };
+          const ann = layer as { position: [number, number, number]; title: string; content?: string; id: string; visible: boolean };
           allAnnotations.push({
             position: [...ann.position],
             title: ann.title,
             description: ann.content ?? "",
+            visible: parentVisible && (ann.visible ?? true),
             uuid: ann.id,
             offset: [0, 0, 0],
             children: [],
@@ -1665,8 +1676,7 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
         // console.error(meshModel)
 
         if (meshModel && intersectedMeshModel.current != meshModel.id) {
-            intersectedPointCloud.current = meshModel.id;
-            console.error(meshModel)
+            intersectedMeshModel.current = meshModel.id;
             StatusBarActions.setModelData(
               meshModel?.id,
               meshModel?.name,

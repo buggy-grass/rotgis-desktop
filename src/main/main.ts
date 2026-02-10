@@ -1,13 +1,26 @@
-import { app, BrowserWindow, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, protocol } from "electron";
 import * as path from "path";
 import { spawn, exec } from "child_process";
 import { promisify } from "util";
 import * as fs from "fs";
 import * as fsPromises from "fs/promises";
+import { createServer, LocalServer } from "./server/server";
+import {
+  initDatabase,
+  closeDatabase,
+  handleDatabaseQuery,
+  type DatabaseQueryPayload,
+} from "./DatabaseService";
 
 const execAsync = promisify(exec);
 
 let mainWindow: BrowserWindow | null = null;
+let rasterServer: LocalServer | null = null;
+
+// Özel rotgis şemasını fetch ile kullanılabilir yap (app.whenReady'den ÖNCE çağrılmalı)
+protocol.registerSchemesAsPrivileged([
+  { scheme: "rotgis", privileges: { standard: true, supportFetchAPI: true } },
+]);
 
 // Potree için maksimum performans optimizasyonları
 // GPU ve Hardware Acceleration ayarları
@@ -545,6 +558,14 @@ ipcMain.handle("window-is-maximized", () => {
   return mainWindow ? mainWindow.isMaximized() : false;
 });
 
+// Database IPC handler (better-sqlite3)
+ipcMain.handle(
+  "database-query",
+  (_event, payload: DatabaseQueryPayload) => {
+    return handleDatabaseQuery(payload);
+  }
+);
+
 // File system IPC handlers
 interface FileSystemItem {
   name: string;
@@ -916,7 +937,7 @@ ipcMain.handle("get-app-path", async (): Promise<string> => {
   }
 });
 
-// Execute shell command and stream stdout/stderr
+// Execute shell command; optionally capture stdout/stderr (no streaming) or stream to renderer
 ipcMain.handle(
   "execute-command",
   async (
@@ -926,68 +947,96 @@ ipcMain.handle(
       args?: string[];
       cwd?: string;
       env?: Record<string, string>;
+      /** When true, stdout/stderr are collected and returned; no streaming to renderer */
+      captureOutput?: boolean;
     }
-  ): Promise<{ success: boolean; exitCode: number; error?: string }> => {
+  ): Promise<
+    | { success: boolean; exitCode: number; error?: string }
+    | { success: boolean; exitCode: number; stdout: string; stderr: string }
+  > => {
     return new Promise((resolve) => {
       try {
-        const { command, args = [], cwd, env } = options;
+        const { command, args = [], cwd, env, captureOutput = false } = options;
 
         const childProcess = spawn(command, args, {
           cwd: cwd || process.cwd(),
           env: { ...process.env, ...env },
-          shell: process.platform === "win32", // Windows'ta shell kullan
+          shell: process.platform === "win32",
         });
 
         let stdoutData = "";
         let stderrData = "";
 
-        // stdout stream
         childProcess.stdout?.on("data", (data: Buffer) => {
           const text = data.toString("utf8");
           stdoutData += text;
-          // Her satırı renderer'a gönder
-          const lines = text.split("\n").filter((line) => line.trim());
-          lines.forEach((line) => {
-            if (mainWindow) {
-              mainWindow.webContents.send("command-stdout", line);
-            }
-          });
+          if (!captureOutput && mainWindow) {
+            const lines = text.split("\n").filter((line) => line.trim());
+            lines.forEach((line) => {
+              mainWindow?.webContents.send("command-stdout", line);
+            });
+          }
         });
 
-        // stderr stream
         childProcess.stderr?.on("data", (data: Buffer) => {
           const text = data.toString("utf8");
           stderrData += text;
-          // Her satırı renderer'a gönder
-          const lines = text.split("\n").filter((line) => line.trim());
-          lines.forEach((line) => {
-            if (mainWindow) {
-              mainWindow.webContents.send("command-stderr", line);
-            }
-          });
+          if (!captureOutput && mainWindow) {
+            const lines = text.split("\n").filter((line) => line.trim());
+            lines.forEach((line) => {
+              mainWindow?.webContents.send("command-stderr", line);
+            });
+          }
         });
 
         childProcess.on("close", (code) => {
-          resolve({
-            success: code === 0,
-            exitCode: code || 0,
-            error: stderrData || undefined,
-          });
+          if (captureOutput) {
+            resolve({
+              success: code === 0,
+              exitCode: code || 0,
+              stdout: stdoutData,
+              stderr: stderrData,
+            });
+          } else {
+            resolve({
+              success: code === 0,
+              exitCode: code || 0,
+              error: stderrData || undefined,
+            });
+          }
         });
 
         childProcess.on("error", (error) => {
-          resolve({
-            success: false,
-            exitCode: -1,
-            error: error.message,
-          });
+          if (captureOutput) {
+            resolve({
+              success: false,
+              exitCode: -1,
+              stdout: stdoutData,
+              stderr: error.message,
+            });
+          } else {
+            resolve({
+              success: false,
+              exitCode: -1,
+              error: error.message,
+            });
+          }
         });
       } catch (error: any) {
-        resolve({
-          success: false,
-          exitCode: -1,
-          error: error?.message || "Unknown error",
-        });
+        resolve(
+          options.captureOutput
+            ? {
+                success: false,
+                exitCode: -1,
+                stdout: "",
+                stderr: error?.message || "Unknown error",
+              }
+            : {
+                success: false,
+                exitCode: -1,
+                error: error?.message || "Unknown error",
+              }
+        );
       }
     });
   }
@@ -1038,6 +1087,18 @@ if (process.platform === "win32" && process.env.GPUSET !== "true" && !isDev) {
   }
   // App hazır olmadan önce performans ayarları
   app.whenReady().then(() => {
+    console.log("[Main] app.whenReady fired");
+    // Veritabanı bağlantısını başlat (models/*.sql migrations çalıştırılır)
+    try {
+      initDatabase();
+      console.log("[Main] Database init OK");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : "";
+      console.error("[Main] Database init failed:", msg);
+      if (stack) console.error("[Main] Stack:", stack);
+    }
+
     // Windows'ta App User Model ID ayarla (taskbar icon için önemli)
     if (process.platform === "win32") {
       app.setAppUserModelId("com.rotgis.desktop");
@@ -1130,6 +1191,56 @@ if (process.platform === "win32" && process.env.GPUSET !== "true" && !isDev) {
     const gpuInfo = app.getGPUFeatureStatus();
     console.log("GPU Info:", gpuInfo);
 
+    // Raster/GeoTIFF dosyalarını renderer'a sunmak için özel protocol (file:// CORS hatasını önler)
+    protocol.handle("rotgis", async (request: Request) => {
+      try {
+        const url = new URL(request.url);
+        const pathParam = url.searchParams.get("path");
+        if (!pathParam) {
+          return new Response("Missing path", { status: 400 });
+        }
+        const filePath = decodeURIComponent(pathParam);
+        const rangeHeader = request.headers.get("Range") ?? request.headers.get("range");
+        const stat = await fsPromises.stat(filePath);
+        const total = stat.size;
+        let start = 0;
+        let end = total - 1;
+        if (rangeHeader && rangeHeader.startsWith("bytes=")) {
+          const parts = rangeHeader.slice(6).split("-");
+          start = parseInt(parts[0], 10) || 0;
+          end = parts[1] ? parseInt(parts[1], 10) : total - 1;
+          end = Math.min(end, total - 1);
+        }
+        const len = end - start + 1;
+        const buf = Buffer.alloc(len);
+        const fd = await fsPromises.open(filePath, "r");
+        await fd.read(buf, 0, len, start);
+        await fd.close();
+        const responseHeaders: Record<string, string> = {
+          "Content-Type": "image/tiff",
+          "Content-Length": String(buf.length),
+          "Accept-Ranges": "bytes",
+        };
+        if (rangeHeader) {
+          responseHeaders["Content-Range"] = `bytes ${start}-${end}/${total}`;
+        }
+        return new Response(buf, {
+          status: rangeHeader ? 206 : 200,
+          headers: responseHeaders,
+        });
+      } catch (err: any) {
+        console.error("rotgis protocol error:", err?.message);
+        return new Response(err?.message || "File read error", { status: 500 });
+      }
+    });
+
+    // COG/raster için yerel HTTP sunucusu (Range destekli, dronet ile aynı yapı)
+    rasterServer = createServer();
+    ipcMain.handle("get-raster-server-port", () => rasterServer?.port ?? 0);
+    ipcMain.on("set-raster-server-path", (_event, projectPath: string | null) => {
+      rasterServer?.setProjectPath(projectPath ?? null);
+    });
+
     // Windows'ta GPU adapter index'ini dinamik olarak bul ve ayarla
     if (process.platform === "win32") {
       // GPU adapter listesini al (Electron API ile)
@@ -1160,6 +1271,9 @@ if (process.platform === "win32" && process.env.GPUSET !== "true" && !isDev) {
 
 // Memory leak önleme - app çıkışında temizlik
 app.on("before-quit", () => {
+  rasterServer?.close();
+  rasterServer = null;
+  closeDatabase();
   if (mainWindow) {
     mainWindow.removeAllListeners();
   }

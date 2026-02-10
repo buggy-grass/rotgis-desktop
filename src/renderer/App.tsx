@@ -18,12 +18,6 @@ const App = memo(function App() {
   const viewerLoaded = useSelector((state: RootState) => state.appReducer.viewerLoaded);
   const renderCount = useRef(0);
   renderCount.current += 1;
-  const project = useSelector((state: RootState) => state.projectReducer.project);
-  // Potree için memory ve performance optimizasyonları
-
-  useEffect(() => {
-    console.log("Current project changed:", project);
-  }, [project]);
 
   // Initialize project, config, and auto-save
   useEffect(() => {

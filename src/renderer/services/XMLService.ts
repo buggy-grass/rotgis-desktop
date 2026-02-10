@@ -5,6 +5,7 @@ import {
   OutCoordSys,
   MeasurementLayer,
   AnnotationLayer,
+  Raster,
 } from "../types/ProjectTypes";
 
 /**
@@ -97,6 +98,9 @@ export function serializeProjectXML(project: ProjectXML): string {
   project.metadata.orthophoto.forEach((orthophoto) => {
     xmlParts.push(serializeOrthophoto(orthophoto, "        "));
   });
+  project.metadata.raster.forEach((raster) => {
+    xmlParts.push(serializeRaster(raster, "        "));
+  });
   xmlParts.push("        <dem>");
   project.metadata.dsm.forEach((dsm) => {
     xmlParts.push(serializeOrthophoto(dsm, "            ", "dsm"));
@@ -173,6 +177,7 @@ function parseMetadata(element: Element | null): Metadata {
       mesh: [],
       pointCloud: [],
       orthophoto: [],
+      raster: [],
       dsm: [],
       dtm: [],
     };
@@ -191,6 +196,9 @@ function parseMetadata(element: Element | null): Metadata {
     ),
     orthophoto: Array.from(element.querySelectorAll("orthophoto")).map(
       (orthophoto) => parseOrthophoto(orthophoto)
+    ),
+    raster: Array.from(element.querySelectorAll("raster")).map((r) =>
+      parseRaster(r)
     ),
     // Only get DSM from within <dem> element, not from <pointCloud> elements
     dsm: demElement 
@@ -322,6 +330,71 @@ function parseOrthophoto(element: Element) {
     cogPath: getTextContent(element.querySelector("cogPath")),
     import: getBooleanContent(element.querySelector("import")),
   };
+}
+
+function parseRaster(element: Element): Raster {
+  if (!element) {
+    throw new Error("parseRaster: element is null");
+  }
+  const centerElements = element.querySelectorAll("center");
+  let center = { x: 0, y: 0 };
+  if (centerElements.length >= 2) {
+    center = {
+      x: getNumberContent(centerElements[0]),
+      y: getNumberContent(centerElements[1]),
+    };
+  } else if (centerElements.length === 1) {
+    center = parseCenter(centerElements[0]);
+  }
+  const bbox = parseBBox(element.querySelector("bbox"));
+  if (center.x === 0 && center.y === 0 && (bbox.min.x !== 0 || bbox.max.x !== 0)) {
+    center = {
+      x: (bbox.min.x + bbox.max.x) / 2,
+      y: (bbox.min.y + bbox.max.y) / 2,
+    };
+  }
+  const bandsEl = element.querySelector("bands");
+  const bands: Raster["bands"] = !bandsEl
+    ? []
+    : Array.from(bandsEl.querySelectorAll("band")).map((bandEl) => ({
+        band: getNumberContent(bandEl.querySelector("index") ?? bandEl.querySelector("band"), 1),
+        type: getTextContent(bandEl.querySelector("type")) || undefined,
+        block: undefined,
+      }));
+  return {
+    id: getTextContent(element.querySelector("id")),
+    name: getTextContent(element.querySelector("name")),
+    fileType: "raster" as const,
+    extension: getTextContent(element.querySelector("extension")),
+    asset: getTextContent(element.querySelector("asset")),
+    path: getTextContent(element.querySelector("path")),
+    bbox,
+    center,
+    epsg: getTextContent(element.querySelector("epsg")),
+    epsgText: getTextContent(element.querySelector("epsgText")),
+    proj4: getTextContent(element.querySelector("proj4")),
+    width: getNumberContent(element.querySelector("width")),
+    height: getNumberContent(element.querySelector("height")),
+    bands: bands.length ? bands : [{ band: 1, type: "Unknown" }],
+    import: getBooleanContent(element.querySelector("import")),
+    cogPath: getTextContent(element.querySelector("cogPath")) || undefined,
+    wgs84Extent: parseWgs84Extent(element.querySelector("wgs84Extent")),
+  };
+}
+
+function parseWgs84Extent(element: Element | null): Raster["wgs84Extent"] {
+  if (!element) return undefined;
+  const text = getTextContent(element);
+  if (!text) return undefined;
+  try {
+    const parsed = JSON.parse(text) as { type?: string; coordinates?: number[][][] };
+    if (parsed && typeof parsed.type === "string" && Array.isArray(parsed.coordinates)) {
+      return { type: parsed.type, coordinates: parsed.coordinates };
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
 }
 
 function parseBBox(element: Element | null) {
@@ -540,6 +613,41 @@ function serializeOrthophoto(
   parts.push(`${indent}    <cogPath>${escapeXML(ortho.cogPath)}</cogPath>`);
   parts.push(`${indent}    <import>${ortho.import}</import>`);
   parts.push(`${indent}</${tagName}>`);
+  return parts.join("\n");
+}
+
+function serializeRaster(raster: Raster, indent: string): string {
+  const parts: string[] = [];
+  parts.push(`${indent}<raster>`);
+  parts.push(`${indent}    <id>${escapeXML(raster.id)}</id>`);
+  parts.push(`${indent}    <name>${escapeXML(raster.name)}</name>`);
+  parts.push(`${indent}    <fileType>${raster.fileType}</fileType>`);
+  parts.push(`${indent}    <extension>${escapeXML(raster.extension)}</extension>`);
+  parts.push(`${indent}    <asset>${escapeXML(raster.asset)}</asset>`);
+  parts.push(`${indent}    <path>${escapeXML(raster.path)}</path>`);
+  parts.push(serializeBBox(raster.bbox, `${indent}    `));
+  parts.push(serializeCenter(raster.center, `${indent}    `));
+  parts.push(`${indent}    <epsg>${escapeXML(raster.epsg)}</epsg>`);
+  parts.push(`${indent}    <epsgText>${escapeXML(raster.epsgText)}</epsgText>`);
+  parts.push(`${indent}    <proj4>${escapeXML(raster.proj4)}</proj4>`);
+  parts.push(`${indent}    <width>${raster.width}</width>`);
+  parts.push(`${indent}    <height>${raster.height}</height>`);
+  if (raster.bands && raster.bands.length > 0) {
+    parts.push(`${indent}    <bands>`);
+    raster.bands.forEach((b) => {
+      parts.push(`${indent}        <band>`);
+      parts.push(`${indent}            <index>${b.band}</index>`);
+      if (b.type) parts.push(`${indent}            <type>${escapeXML(b.type)}</type>`);
+      parts.push(`${indent}        </band>`);
+    });
+    parts.push(`${indent}    </bands>`);
+  }
+  parts.push(`${indent}    <import>${raster.import}</import>`);
+  if (raster.cogPath) parts.push(`${indent}    <cogPath>${escapeXML(raster.cogPath)}</cogPath>`);
+  if (raster.wgs84Extent?.coordinates?.length) {
+    parts.push(`${indent}    <wgs84Extent>${escapeXML(JSON.stringify(raster.wgs84Extent))}</wgs84Extent>`);
+  }
+  parts.push(`${indent}</raster>`);
   return parts.join("\n");
 }
 

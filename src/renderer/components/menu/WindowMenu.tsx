@@ -88,6 +88,9 @@ const WindowMenu = () => {
       // Update project in store
       ProjectActions.updateProject(currentProject);
       ProjectActions.setProjectPaths(result.projectFile, result.projectFolder);
+      if (window.electronAPI?.setRasterServerPath) {
+        window.electronAPI.setRasterServerPath(result.projectFolder ?? null);
+      }
       ProjectActions.setDirty(false);
       
       setShowSaveDialog(false);

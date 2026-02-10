@@ -1,12 +1,86 @@
 import AppActions from "../store/actions/AppActions";
 
+type ConverterProgressResult = {
+  percentage?: number; // 13%
+  stage?: string; // "COUNTING: 38%"
+  duration?: string | null;
+  throughput?: string | null;
+  ram?: string | null;
+  cpu?: number | null;
+};
+
 export interface CommandOptions {
   command: string;
   args?: string[];
   cwd?: string;
   env?: Record<string, string>;
+  process: "converter" | "other";
   onProgress?: (percentage: number, message: string) => void;
-  parseProgress?: (line: string) => { percentage?: number; message?: string } | null;
+  parseProgress?: (line: string) => ConverterProgressResult | null;
+}
+
+/** Options for executeAndCapture (no streaming, no loading UI) */
+export interface CaptureCommandOptions {
+  command: string;
+  args?: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+}
+
+export const converterProgressParser = (
+  line?: string | null,
+): ConverterProgressResult | null => {
+  if (typeof line !== "string") return null;
+  if (line.includes("[INFO]")) return null;
+  // 🔥 kritik temizlik
+  const text = line
+    .replace(/\r/g, "")   // Windows CR
+    .trim()
+    .replace(/,$/, "");   // sondaki virgül
+
+  if (!text) return null;
+
+  // 1️⃣ [13%, 10s]
+  {
+    const m = text.match(
+      /^\[(\d+(?:\.\d+)?)%\s*,\s*([^\[\]]+)\]$/
+    );
+    if (m) {
+      return {
+        percentage: Number(m[1]),
+        duration: m[2],
+      };
+    }
+  }
+
+  // 2️⃣ [COUNTING: 38%, duration: 10s, throughput: 19MPs]
+  {
+    const m = text.match(
+      /^\[(\w+:\s*\d+(?:\.\d+)?%)\s*,\s*duration:\s*([^,]+)\s*,\s*throughput:\s*([^\[\]]+)\]$/
+    );
+    if (m) {
+      return {
+        stage: m[1],
+        duration: m[2],
+        throughput: m[3],
+      };
+    }
+  }
+
+  // 3️⃣ [RAM: 1.0GB (highest 1.0GB), CPU: 76%]
+  {
+    const m = text.match(
+      /^\[RAM:\s*([^,]+)\s*,\s*CPU:\s*(\d+)%\]$/
+    );
+    if (m) {
+      return {
+        ram: m[1],
+        cpu: Number(m[2]),
+      };
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -14,50 +88,41 @@ export interface CommandOptions {
  * Also handles: [PROGRESS]: 52.20 (without INFO) or [INFO]: message (without PROGRESS)
  */
 const defaultProgressParser = (line: string): { percentage?: number; message?: string } | null => {
-  // Format: [INFO]: message [PROGRESS]: 52.20
-  // Try to match both INFO and PROGRESS together
-  const fullMatch = line.match(/\[INFO\]:\s*(.+?)\s*\[PROGRESS\]:\s*([\d.]+)/);
-  
-  if (fullMatch) {
-    // Both INFO and PROGRESS found
-    const message = fullMatch[1].trim();
-    const percentage = parseFloat(fullMatch[2]);
-    
+  // Skip separator lines like "====="
+  if (/^\s*=+\s*$/.test(line)) {
+    return null;
+  }
+  // Pattern: [14%, 1s], [COUNTING: 43%, duration: 1s, throughput: 6MPs]
+  const bracketProgressMatch = line.match(/^\s*\[(\d+(?:\.\d+)?)%\s*,[^\]]*]\s*,\s*\[([^\]]+)]/);
+  if (bracketProgressMatch) {
+    const percentage = parseFloat(bracketProgressMatch[1]);
+    const messageBlock = bracketProgressMatch[2].trim();
+    const message = messageBlock.split(",")[0]?.trim();
     return {
       percentage: Math.max(0, Math.min(100, percentage)),
-      message: message || undefined,
+      message: message && message.length > 0 ? message : undefined,
     };
   }
-  
-  // Try to match only PROGRESS: [PROGRESS]: 52.20
-  const progressOnlyMatch = line.match(/\[PROGRESS\]:\s*([\d.]+)/);
-  if (progressOnlyMatch) {
-    const percentage = parseFloat(progressOnlyMatch[1]);
-    // Try to extract message from before PROGRESS if exists
-    const messageMatch = line.match(/\[INFO\]:\s*(.+?)(?:\s*\[PROGRESS\]:|$)/);
-    const message = messageMatch ? messageMatch[1].trim() : undefined;
-    
-    return {
-      percentage: Math.max(0, Math.min(100, percentage)),
-      message: message,
-    };
-  }
-  
-  // Try to match only INFO: [INFO]: message
-  const infoOnlyMatch = line.match(/\[INFO\]:\s*(.+)/);
-  if (infoOnlyMatch) {
-    const message = infoOnlyMatch[1].trim();
-    return {
-      message: message,
-    };
-  }
-  
+
   return null;
+};
+
+const getProgressByType = (type: "converter" | "other") => {
+  switch (type) {
+    case "converter":
+      return converterProgressParser;
+    case "other":
+      return null;
+  }
 };
 
 class ShellCommandService {
   private static currentProcess: {
-    resolve: (value: { success: boolean; exitCode: number; error?: string }) => void;
+    resolve: (value: {
+      success: boolean;
+      exitCode: number;
+      error?: string;
+    }) => void;
     reject: (reason?: any) => void;
   } | null = null;
 
@@ -88,18 +153,27 @@ class ShellCommandService {
       window.electronAPI.onCommandStdout((line: string) => {
         try {
           // Use custom parser if provided, otherwise use default parser
-          const parser = options.parseProgress || defaultProgressParser;
+          if(line.includes("[INFO]") || line.includes("====")){
+            return;
+          }
+          const parser =
+            getProgressByType(options.process);
+          if (!parser) {
+            return;
+          }
           const parsed = parser(line);
-          
+          console.error(parsed)
           if (parsed) {
+            
             if (parsed.percentage !== undefined) {
-              lastPercentage = Math.max(0, Math.min(100, parsed.percentage));
+              lastPercentage = parsed.percentage;
+              // lastPercentage = Math.max(0, Math.min(100, parsed.percentage));
             }
-            if (parsed.message !== undefined) {
-              lastMessage = parsed.message;
+            if (parsed.stage !== undefined) {
+              lastMessage = parsed.stage;
             }
             AppActions.setLoadingProgress(lastPercentage, lastMessage);
-            
+
             // Call custom progress callback if provided
             if (options.onProgress) {
               options.onProgress(lastPercentage, lastMessage);
@@ -109,7 +183,7 @@ class ShellCommandService {
             if (line.trim()) {
               lastMessage = line.trim();
               AppActions.setLoadingProgress(lastPercentage, lastMessage);
-              
+
               if (options.onProgress) {
                 options.onProgress(lastPercentage, lastMessage);
               }
@@ -124,18 +198,26 @@ class ShellCommandService {
       window.electronAPI.onCommandStderr((line: string) => {
         try {
           // Use custom parser if provided, otherwise use default parser
-          const parser = options.parseProgress || defaultProgressParser;
+          if(line.includes("[INFO]") || line.includes("====")){
+            return;
+          }
+          const parser =
+            options.parseProgress || getProgressByType(options.process);
+          if (!parser) {
+            return;
+          }
+
           const parsed = parser(line);
-          
+
           if (parsed) {
             if (parsed.percentage !== undefined) {
               lastPercentage = Math.max(0, Math.min(100, parsed.percentage));
             }
-            if (parsed.message !== undefined) {
-              lastMessage = parsed.message;
+            if (parsed.stage !== undefined) {
+              lastMessage = parsed.stage;
             }
             AppActions.setLoadingProgress(lastPercentage, lastMessage);
-            
+
             if (options.onProgress) {
               options.onProgress(lastPercentage, lastMessage);
             }
@@ -144,7 +226,7 @@ class ShellCommandService {
             if (line.trim()) {
               lastMessage = line.trim();
               AppActions.setLoadingProgress(lastPercentage, lastMessage);
-              
+
               if (options.onProgress) {
                 options.onProgress(lastPercentage, lastMessage);
               }
@@ -183,6 +265,34 @@ class ShellCommandService {
   }
 
   /**
+   * Execute a command and return full stdout/stderr (e.g. gdalinfo -json).
+   * Does not stream, does not show loading progress. Use for capture-only runs.
+   */
+  static async executeAndCapture(
+    options: CaptureCommandOptions
+  ): Promise<{ success: boolean; exitCode: number; stdout: string; stderr: string }> {
+    const result = await window.electronAPI.executeCommand({
+      command: options.command,
+      args: options.args,
+      cwd: options.cwd,
+      env: options.env,
+      captureOutput: true,
+    });
+    const withStd = result as {
+      success: boolean;
+      exitCode: number;
+      stdout: string;
+      stderr: string;
+    };
+    return {
+      success: withStd.success,
+      exitCode: withStd.exitCode,
+      stdout: withStd.stdout ?? "",
+      stderr: withStd.stderr ?? "",
+    };
+  }
+
+  /**
    * Cancel current command execution
    */
   static cancel(): void {
@@ -197,4 +307,3 @@ class ShellCommandService {
 }
 
 export default ShellCommandService;
-

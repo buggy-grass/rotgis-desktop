@@ -71,6 +71,18 @@ class PathService {
     return window.electronAPI.pathJoin(appPath, 'libs', 'potree');
   }
 
+  static async getPGDALPath(): Promise<string> {
+    const appPath = await this.getAppPath();
+    this.ensureElectronAPI();
+    return window.electronAPI.pathJoin(appPath, 'bin', 'launcher.bat');
+  }
+
+  static async getPGDALFolderPath(): Promise<string> {
+    const appPath = await this.getAppPath();
+    this.ensureElectronAPI();
+    return window.electronAPI.pathJoin(appPath, 'bin');
+  }
+
   /**
    * Get PotreeConverter.exe path
    * @returns Promise<string> Path to PotreeConverter.exe

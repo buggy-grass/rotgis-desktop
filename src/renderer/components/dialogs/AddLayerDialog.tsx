@@ -12,7 +12,7 @@ import { Label } from "../ui/label";
 import { Cloud, Box, Layers, FileUp, FolderOpen } from "lucide-react";
 import { Input } from "../ui/input";
 
-type LayerType = "point-cloud" | "mesh" | "vector";
+type LayerType = "point-cloud" | "mesh" | "vector" | "raster";
 
 interface LayerTypeOption {
   value: LayerType;
@@ -33,6 +33,12 @@ const layerTypes: LayerTypeOption[] = [
     label: "Mesh Layer",
     icon: Box,
     extensions: [".obj"],
+  },
+  {
+    value: "raster",
+    label: "Raster Layer",
+    icon: Box,
+    extensions: [".tif"],
   },
   {
     value: "vector",
