@@ -175,6 +175,7 @@ class RasterService {
           "-of COG",
           "-co COMPRESS=LZW",
           "-co BIGTIFF=YES",
+          "-co TILING_SCHEME None",
           shortPath,
           cogOutputPath,
         ],

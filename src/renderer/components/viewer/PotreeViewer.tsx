@@ -19,7 +19,14 @@ import { Button } from "../ui/button";
 import AppActions from "../../store/actions/AppActions";
 import MeshService from "../../services/MeshService";
 
-const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
+export interface PotreeViewerProps {
+  display: string;
+  syncEnabled?: boolean;
+}
+const PotreeViewer: React.FC<PotreeViewerProps> = ({
+  display,
+  syncEnabled = false,
+}) => {
   const potreeRenderAreaRef = React.useRef<HTMLDivElement>(null);
   const canvasRef = React.useRef<HTMLElement | null>(null);
   const [isMouseWheelHeld, setIsMouseWheelHeld] = React.useState(false);
@@ -368,6 +375,28 @@ const PotreeViewer: React.FC<{ display: string }> = ({ display }) => {
       window.removeEventListener("mouseup", handleMouseUp);
     }
   }, [display]);
+
+  // Sync: 3D’de tıklanınca koordinatı 2D’ye gönder (eventBus)
+  useEffect(() => {
+    if (!syncEnabled || display !== "block" || !window.viewer?.scene) return;
+    const viewer = window.viewer;
+    const canvas = viewer.renderer?.domElement;
+    if (!canvas) return;
+
+    const onSyncClick = (e: MouseEvent) => {
+      if (window.eventBus) {
+        const currentCoord = StatusBarActions.getStatusBarState();
+        window.eventBus.emit("viewer:syncCoordinate", {
+          x: currentCoord.coordinates.x,
+          y: currentCoord.coordinates.y,
+          z: currentCoord.coordinates.z,
+        });
+      }
+    };
+
+    canvas.addEventListener("mousedown", onSyncClick);
+    return () => canvas.removeEventListener("mousedown", onSyncClick);
+  }, [syncEnabled, display]);
 
   const loadPointCloud = (pointCloudPath: string, id: string) => {
     window.Potree.loadPointCloud(pointCloudPath, id, (e: any) => {

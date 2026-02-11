@@ -6,6 +6,7 @@ import {
   Box,
   Columns2,
   LayoutGrid,
+  Link2,
   Split,
   SquareSplitHorizontal,
 } from "lucide-react";
@@ -35,6 +36,7 @@ const Viewer: React.FC<ViewerProps> = ({
   const [internalViewMode, setInternalViewMode] = useState<ViewMode>("3d");
   const viewMode = externalViewMode ?? internalViewMode;
   const setViewMode = onViewModeChange ?? setInternalViewMode;
+  const [syncEnabled, setSyncEnabled] = useState(false);
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
@@ -161,6 +163,15 @@ const Viewer: React.FC<ViewerProps> = ({
             >
               <Columns2 className="h-3 w-3" />
             </Button>
+            <Button
+              variant={syncEnabled ? "default" : "ghost"}
+              size="sm"
+              className="h-4 px-2 text-xs"
+              onClick={() => setSyncEnabled((v) => !v)}
+              title={syncEnabled ? "Sync kapalı (3D tıklama 2D’yi güncellemez)" : "Sync açık (3D’de tıkla, 2D’de konum + R işareti)"}
+            >
+              <Link2 className="h-3 w-3" />
+            </Button>
           </div>
         </div>
       </div>
@@ -191,7 +202,7 @@ const Viewer: React.FC<ViewerProps> = ({
             zIndex: 1, // Viewer'lar en altta
           }}
         >
-          <PotreeViewer display="block" />
+          <PotreeViewer display="block" syncEnabled={syncEnabled} />
         </div>
 
         {/* 2D Viewer - Her zaman render edilir, CSS ile pozisyon ve görünürlük kontrol edilir */}

@@ -76,6 +76,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
   const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null);
   const [colorPickerPosition, setColorPickerPosition] = useState<{ x: number; y: number } | null>(null);
   const colorPickerRef = useRef<HTMLDivElement>(null);
+  const [rasterVisibility, setRasterVisibility] = useState<Record<string, boolean>>({});
 
   // Filter valid point clouds (with existing assets)
   const [validPointClouds, setValidPointClouds] = useState<PointCloud[]>([]);
@@ -228,11 +229,11 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
       children: vectorChildren,
     });
 
-    // Raster Layer
+    // Raster Layer (görünürlük rasterVisibility state ile)
     const rasterChildren: Layer[] = (raster || []).map((r) => ({
       id: r.id,
       name: `${r.name}${r.extension}`,
-      visible: true,
+      visible: rasterVisibility[r.id] ?? true,
       type: "raster" as const,
       data: r,
     }));
@@ -245,7 +246,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
     });
 
     return layersArray;
-  }, [project?.metadata, validPointClouds]);
+  }, [project?.metadata, validPointClouds, rasterVisibility]);
 
   // Get all layer IDs that have children or are point clouds (Measurements/Annotation accordion için)
   const getAllLayerIdsWithChildren = (items: Layer[]): string[] => {
@@ -393,9 +394,16 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
           }
         }
       }
+    } else if (layerType === "raster") {
+      const currentVisible = rasterVisibility[layerId] ?? true;
+      setRasterVisibility((prev) => ({ ...prev, [layerId]: !currentVisible }));
+      if (window.eventBus) {
+        window.eventBus.emit("openlayers:rasterVisibility", {
+          rasterId: layerId,
+          visible: !currentVisible,
+        });
+      }
     } else {
-      // For other layer types, use local state (if needed in future)
-      // For now, just log
       console.log(`Toggle visibility for ${layerType} layer ${layerId}`);
     }
   };
@@ -457,7 +465,7 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
         : layer.type === "annotation" && layer.data
         ? (layer.data as AnnotationLayer).visible
         : layer.type === "raster"
-        ? true
+        ? layer.visible
         : true;
 
     // Get point cloud ID for measurement/annotation layers
@@ -727,7 +735,10 @@ const Layers = forwardRef<LayersRef, LayersProps>((props, ref) => {
               if (lon < minLon) minLon = lon; if (lat < minLat) minLat = lat;
               if (lon > maxLon) maxLon = lon; if (lat > maxLat) maxLat = lat;
             }
-            window.eventBus.emit("openlayers:fitExtent", { extent: [minLon, minLat, maxLon, maxLat] });
+            window.eventBus.emit("openlayers:fitExtent", {
+              extent: [minLon, minLat, maxLon, maxLat],
+              rasterId: r.id,
+            });
           }
         }
       };
