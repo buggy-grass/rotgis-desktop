@@ -1,6 +1,7 @@
 import { parseProjectXML } from "./XMLService";
 import { ProjectXML } from "../types/ProjectTypes";
 import ProjectActions from "../store/actions/ProjectActions";
+import { ipcRenderer } from "electron";
 
 /**
  * Helper to join paths (simple implementation for browser environment)
@@ -171,7 +172,12 @@ export async function openProject(): Promise<void> {
     // Load and validate project
     const { project, projectFilePath, projectFolderPath } = await loadProjectFromFile(selectedFilePath);
 
-    console.error(project);
+    try {
+        await window.electronAPI.setRasterServerPath(project.project.path);
+      } catch (err) {
+        console.error(("set-raster-server-path " + err) as string);
+      }
+
     // Update store
     ProjectActions.setProject(project);
     ProjectActions.setProjectPaths(projectFilePath, projectFolderPath);

@@ -110,6 +110,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pathBasename: (filePath: string) => {
     return path.basename(filePath);
   },
+  setRasterServerPath: (projectPath: string) => {
+    return ipcRenderer.invoke('set-raster-server-path', projectPath);
+  },
   // Database (better-sqlite3) - okuma/yazma
   database: {
     get: (sql: string, params?: unknown[]) =>

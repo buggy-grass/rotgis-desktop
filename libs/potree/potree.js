@@ -84295,6 +84295,7 @@ ENDSEC
 			this.wheelDelta = 0;
 			this.zoomDelta = new Vector3();
 			this.camStart = null;
+			this.wheelZoomTriggered = false;
 
 			this.tweens = [];
 
@@ -84471,7 +84472,6 @@ ENDSEC
 					this.camStart = this.scene.getActiveCamera().clone();
 					this.pivotIndicator.visible = true;
 					this.pivotIndicator.position.copy(I.location);
-					console.error(this.camStart)
 
 					this.rotatePivot = true;
 					this.pivotIndicator.rotation.z = this.camStart.rotation._z;
@@ -84624,8 +84624,8 @@ ENDSEC
 					targetDir.normalize();
 
 					resolvedPos.add(targetDir.multiplyScalar(jumpDistance));
+					
 					this.zoomDelta.subVectors(resolvedPos, view.position);
-
 					{
 						let distance = resolvedPos.distanceTo(I.location);
 						view.radius = distance;
@@ -84650,8 +84650,52 @@ ENDSEC
 			if (this.zoomDelta.length() !== 0) {
 				let p = this.zoomDelta.clone().multiplyScalar(progression);
 
+				
 				let newPos = new Vector3().addVectors(view.position, p);
 				view.position.copy(newPos);
+				// {
+				// 	const camera = this.scene.getActiveCamera().clone();
+				// 	const target = this.viewer.scene.view.getPivot();
+				// 	const distance = camera.position.distanceTo(target);
+				// 	const dir = camera.getWorldDirection(new THREE.Vector3());
+				// 	const rawYaw = Math.atan2(dir.x, dir.y);
+				// 	window.eventBus.emit("cameraZoomChanged", {
+				// 		fov: camera.fov,
+				// 		screenHeight: this.viewer.renderer.domElement.clientHeight,
+				// 		distance: distance,
+				// 		x: target.x,
+				// 		y: target.y,
+				// 		yaw: unwrapAngle(rawYaw)
+				// 	});
+				// }
+
+				{
+					let lastYaw = 0;
+
+					const unwrapAngle = (newYaw) => {
+						let delta = newYaw - lastYaw;
+
+						if (delta > Math.PI) delta -= 2 * Math.PI;
+						if (delta < -Math.PI) delta += 2 * Math.PI;
+
+						lastYaw += delta;
+						return lastYaw;
+					}
+
+					const camera = window.viewer.scene.getActiveCamera().clone();
+					const target = window.viewer.scene.view.getPivot();
+					const distance = camera.position.distanceTo(target);
+					const dir = camera.getWorldDirection(new THREE.Vector3());
+					const rawYaw = Math.atan2(dir.x, dir.y);
+					window.eventBus.emit("cameraZoomChanged", {
+						fov: camera.fov,
+						screenHeight: window.viewer.renderer.domElement.clientHeight,
+						distance: distance,
+						x: target.x,
+						y: target.y,
+						yaw: unwrapAngle(rawYaw)
+					});
+				}
 			}
 
 			if (this.pivotIndicator.visible) {
@@ -84664,6 +84708,34 @@ ENDSEC
 				let pr = Utils.projectedRadius(1, camera, distance, pixelwidth, pixelHeight);
 				let scale = (10 / pr);
 				this.pivotIndicator.scale.set(scale, scale, scale);
+
+				{
+					let lastYaw = 0;
+
+					const unwrapAngle = (newYaw) => {
+						let delta = newYaw - lastYaw;
+
+						if (delta > Math.PI) delta -= 2 * Math.PI;
+						if (delta < -Math.PI) delta += 2 * Math.PI;
+
+						lastYaw += delta;
+						return lastYaw;
+					}
+
+					const camera = window.viewer.scene.getActiveCamera().clone();
+					const target = window.viewer.scene.view.getPivot();
+					const distance = camera.position.distanceTo(target);
+					const dir = camera.getWorldDirection(new THREE.Vector3());
+					const rawYaw = Math.atan2(dir.x, dir.y);
+					window.eventBus.emit("cameraZoomChanged", {
+						fov: camera.fov,
+						screenHeight: window.viewer.renderer.domElement.clientHeight,
+						distance: distance,
+						x: target.x,
+						y: target.y,
+						yaw: unwrapAngle(rawYaw)
+					});
+				}
 			}
 
 			// decelerate over time

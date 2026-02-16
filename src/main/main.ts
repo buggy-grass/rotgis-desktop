@@ -504,6 +504,9 @@ function createWindow(): void {
               const path = require('path');
               return path.basename(...paths);
             },
+            setRasterServerPath: (projectPath) => {
+                return ipcRenderer.invoke('set-raster-server-path', projectPath);
+            },
             executeCommand: (options) => {
               return ipcRenderer.invoke('execute-command', options);
             },
@@ -958,11 +961,17 @@ ipcMain.handle(
       try {
         const { command, args = [], cwd, env, captureOutput = false } = options;
 
-        const childProcess = spawn(command, args, {
+        const isWindowsBat =
+          process.platform === "win32" &&
+          /\.(bat|cmd)$/i.test(command);
+        const spawnOptions = {
           cwd: cwd || process.cwd(),
           env: { ...process.env, ...env },
-          shell: process.platform === "win32",
-        });
+          shell: isWindowsBat ? false : process.platform === "win32",
+        };
+        const childProcess = isWindowsBat
+          ? spawn(process.env.ComSpec || "cmd.exe", ["/c", command, ...args], spawnOptions)
+          : spawn(command, args, spawnOptions);
 
         let stdoutData = "";
         let stderrData = "";
@@ -1192,6 +1201,7 @@ if (process.platform === "win32" && process.env.GPUSET !== "true" && !isDev) {
     console.log("GPU Info:", gpuInfo);
 
     // Raster/GeoTIFF dosyalarını renderer'a sunmak için özel protocol (file:// CORS hatasını önler)
+    const ROTGIS_MAX_RANGE_BYTES = 16 * 1024 * 1024; // 16 MB – daha büyük istek "Array buffer allocation failed" yapar
     protocol.handle("rotgis", async (request: Request) => {
       try {
         const url = new URL(request.url);
@@ -1211,7 +1221,13 @@ if (process.platform === "win32" && process.env.GPUSET !== "true" && !isDev) {
           end = parts[1] ? parseInt(parts[1], 10) : total - 1;
           end = Math.min(end, total - 1);
         }
-        const len = end - start + 1;
+        let len = end - start + 1;
+        if (len > ROTGIS_MAX_RANGE_BYTES) {
+          return new Response("Range too large", {
+            status: 413,
+            headers: { "Accept-Ranges": "bytes", "Content-Range": `bytes */${total}` },
+          });
+        }
         const buf = Buffer.alloc(len);
         const fd = await fsPromises.open(filePath, "r");
         await fd.read(buf, 0, len, start);
@@ -1237,7 +1253,7 @@ if (process.platform === "win32" && process.env.GPUSET !== "true" && !isDev) {
     // COG/raster için yerel HTTP sunucusu (Range destekli, dronet ile aynı yapı)
     rasterServer = createServer();
     ipcMain.handle("get-raster-server-port", () => rasterServer?.port ?? 0);
-    ipcMain.on("set-raster-server-path", (_event, projectPath: string | null) => {
+    ipcMain.handle("set-raster-server-path", (_event, projectPath: string | null) => {
       rasterServer?.setProjectPath(projectPath ?? null);
     });
 

@@ -47,7 +47,16 @@ interface OpenLayersViewerProps {
   display: string;
 }
 
-/** URL for raster: prefer HTTP (local server with Range) for better COG performance; fallback rotgis. */
+interface PotreeCameraZoom {
+  fov: number;
+  distance: number;
+  screenHeight: number;
+  x: number;
+  y: number;
+  yaw: number;
+}
+
+/** URL for raster (Dronet ile aynı: http://127.0.0.1:port/files/asset). Sadece HTTP; sunucu Range zorunlu. */
 function getRasterUrl(
   fullPath: string,
   assetPath: string,
@@ -120,6 +129,9 @@ const OpenLayersViewer: React.FC<OpenLayersViewerProps> = ({ display }) => {
   );
   const rasters: Raster[] = project?.metadata?.raster ?? [];
   const projectPath = projectFolderPath ?? project?.project?.path ?? "";
+  const potreeZoom = useRef<PotreeCameraZoom | null>(null);
+  const [potreeZoomState, setPotreeZoomState] =
+    useState<PotreeCameraZoom | null>(null);
 
   useEffect(() => {
     if (
@@ -154,7 +166,7 @@ const OpenLayersViewer: React.FC<OpenLayersViewerProps> = ({ display }) => {
         center: [0, 0],
         zoom: 2,
         maxZoom: 24,
-        constrainResolution: true,
+        constrainResolution: false,
         smoothExtentConstraint: false,
       }),
     });
@@ -292,7 +304,7 @@ const OpenLayersViewer: React.FC<OpenLayersViewerProps> = ({ display }) => {
       try {
         const sourceEpsg = raster.epsg || "4326";
         const source = new GeoTIFF({
-          sources: [{ url: rasterUrl }],
+          sources: [{ url: rasterUrl, nodata: -9999, min: 0, max: 255 }],
           convertToRGB: "auto",
           projection: sourceEpsg.startsWith("EPSG:")
             ? sourceEpsg
@@ -301,8 +313,6 @@ const OpenLayersViewer: React.FC<OpenLayersViewerProps> = ({ display }) => {
           wrapX: false,
           // transition: 0,
           sourceOptions: {
-            cacheSize: 256,
-            blockSize: 65536,
             maxRanges: 24,
             allowFullFile: false,
           },
@@ -414,9 +424,29 @@ const OpenLayersViewer: React.FC<OpenLayersViewerProps> = ({ display }) => {
         });
       }
     };
+    const zoom = (data: any) => {
+      potreeZoom.current = {
+        distance: data.distance,
+        fov: data.fov,
+        screenHeight: data.screenHeight,
+        x: data.x,
+        y: data.y,
+        yaw: data.yaw
+      };
+      setPotreeZoomState({
+        distance: data.distance,
+        fov: data.fov,
+        screenHeight: data.screenHeight,
+        x: data.x,
+        y: data.y,
+        yaw: data.yaw
+      });
+    };
     window.eventBus.on("openlayers:fitExtent", handler);
+    window.eventBus.on("cameraZoomChanged", zoom);
     return () => {
       window.eventBus.off("openlayers:fitExtent", handler);
+      window.eventBus.off("cameraZoomChanged", zoom);
     };
   }, []);
 
@@ -448,6 +478,11 @@ const OpenLayersViewer: React.FC<OpenLayersViewerProps> = ({ display }) => {
       z: number;
       epsg: number | string;
       proj4?: string;
+
+      // 👇 yeni eklenenler
+      fov?: number;
+      distance?: number;
+      screenHeight?: number;
     }) => {
       const map = mapInstanceRef.current;
       const overlay = syncMarkerOverlayRef.current;
@@ -461,21 +496,17 @@ const OpenLayersViewer: React.FC<OpenLayersViewerProps> = ({ display }) => {
 
         if (!currentPointCloud) return;
 
-        // ✅ EPSG normalize
         const sourceEpsg =
           typeof currentPointCloud.epsg === "number"
             ? `${currentPointCloud.epsg}`
             : currentPointCloud.epsg;
 
-        // ✅ proj4 register (only if needed)
         if (currentPointCloud.proj4 && !proj4.defs(sourceEpsg)) {
           proj4.defs(sourceEpsg, currentPointCloud.proj4);
         }
 
-        // ✅ map projection (dynamic)
         const targetEpsg = map.getView().getProjection().getCode();
 
-        // ✅ coordinate transform
         const coord = proj4(sourceEpsg, targetEpsg, [payload.x, payload.y]) as [
           number,
           number,
@@ -489,21 +520,46 @@ const OpenLayersViewer: React.FC<OpenLayersViewerProps> = ({ display }) => {
           return;
         }
 
-        // ✅ overlay update
         overlay.setPosition(coord);
 
         const el = overlay.getElement();
         if (el) (el as HTMLElement).style.display = "flex";
 
-        // ✅ smooth view sync
-        const view = map.getView();
-        const zoom = Math.max(view.getZoom() ?? 15, 10);
+        // const view = map.getView();
 
-        view.animate({
-          center: coord,
-          zoom,
-          duration: 250,
-        });
+        // let resolution: number | undefined;
+
+        // if (
+        //   potreeZoom.current?.fov &&
+        //   potreeZoom.current.distance &&
+        //   potreeZoom.current.screenHeight
+        // ) {
+        //   resolution =
+        //     (2 *
+        //       potreeZoom.current.distance *
+        //       Math.tan((potreeZoom.current.fov * Math.PI) / 360)) /
+        //     potreeZoom.current.screenHeight;
+        // }
+
+        // const currentResolution = view.getResolution();
+
+        // const EPSILON = 1e-2; // biraz büyük tolerance
+
+        // const zoomChanged =
+        //   resolution &&
+        //   currentResolution &&
+        //   Math.abs(currentResolution - resolution) > EPSILON;
+
+        // // 🔥 ÖNCE animasyonları durdur
+        // view.cancelAnimations();
+
+        // if (zoomChanged && resolution) {
+        //   // zoom değişmiş → direkt set
+        //   view.setResolution(resolution);
+        // }
+
+        // // center her zaman güncellenir
+        // view.setCenter(coord);
       } catch (err) {
         console.warn("OpenLayersViewer: sync coordinate transform failed", err);
       }
@@ -515,6 +571,105 @@ const OpenLayersViewer: React.FC<OpenLayersViewerProps> = ({ display }) => {
       window.eventBus.off("viewer:syncCoordinate", handler);
     };
   }, [modelData]);
+
+  useEffect(() => {
+    if (potreeZoomState) {
+      const map = mapInstanceRef.current;
+      const overlay = syncMarkerOverlayRef.current;
+      if (!map || !overlay) return;
+      try {
+        const currentPointCloud =
+          ProjectActions.getProjectState().project?.metadata.pointCloud.find(
+            (pc) => pc.id === modelData.id,
+          );
+
+        if (!currentPointCloud) return;
+
+        const sourceEpsg =
+          typeof currentPointCloud.epsg === "number"
+            ? `${currentPointCloud.epsg}`
+            : currentPointCloud.epsg;
+
+        if (currentPointCloud.proj4 && !proj4.defs(sourceEpsg)) {
+          proj4.defs(sourceEpsg, currentPointCloud.proj4);
+        }
+
+        const targetEpsg = map.getView().getProjection().getCode();
+
+        const coord = proj4(sourceEpsg, targetEpsg, [
+          potreeZoomState.x,
+          potreeZoomState.y,
+        ]) as [number, number];
+
+        if (
+          !coord ||
+          !Number.isFinite(coord[0]) ||
+          !Number.isFinite(coord[1])
+        ) {
+          return;
+        }
+
+        // overlay.setPosition(coord);
+
+        const el = overlay.getElement();
+        if (el) (el as HTMLElement).style.display = "flex";
+
+        const view = map.getView();
+
+        let resolution: number | undefined;
+
+        if (
+          potreeZoomState?.fov &&
+          potreeZoomState.distance &&
+          potreeZoomState.screenHeight
+        ) {
+          resolution =
+            (2 *
+              potreeZoomState.distance *
+              Math.tan((potreeZoomState.fov * Math.PI) / 360)) /
+            potreeZoomState.screenHeight;
+        }
+
+        const currentResolution = view.getResolution();
+
+        const EPSILON = 1e-2; // biraz büyük tolerance
+
+        const zoomChanged =
+          resolution &&
+          currentResolution &&
+          Math.abs(currentResolution - resolution) > EPSILON;
+
+        // 🔥 ÖNCE animasyonları durdur
+        view.cancelAnimations();
+
+        if (zoomChanged && resolution) {
+          const maxRes = view.getMaxResolution();
+          const zoom = Math.log2(maxRes / resolution);
+
+          view.setZoom(zoom);
+        }
+
+        if (potreeZoom.current && potreeZoom?.current.yaw !== undefined) {
+          view.setRotation(-potreeZoom.current.yaw);
+        }
+
+        // center sadece ciddi fark varsa güncelle
+        const currentCenter = view.getCenter();
+
+        const CENTER_EPSILON = 0.01;
+
+        if (
+          !currentCenter ||
+          Math.abs(currentCenter[0] - coord[0]) > CENTER_EPSILON ||
+          Math.abs(currentCenter[1] - coord[1]) > CENTER_EPSILON
+        ) {
+          view.setCenter(coord);
+        }
+      } catch (err) {
+        console.warn("OpenLayersViewer: sync coordinate transform failed", err);
+      }
+    }
+  }, [potreeZoomState]);
 
   useEffect(() => {
     if (mapInstanceRef.current && display === "block") {

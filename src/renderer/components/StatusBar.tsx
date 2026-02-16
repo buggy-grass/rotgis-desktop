@@ -38,7 +38,7 @@ const PointCloudDisplay = memo(({ id, name, epsg }: { id: string,name: string, e
         className={`min-w-[50px] text-[12px] font-mono tabular-nums text-foreground/90 transition-all duration-150 ease-out animate-in fade-in zoom-in-95 duration-200`}
         style={{marginTop:"1px"}}
       >
-        {name + ", " + `EPSG:${epsg},`}
+        {name + ", " + `${epsg},`}
       </span>
     </div>
   );

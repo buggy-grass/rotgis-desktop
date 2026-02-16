@@ -136,6 +136,8 @@ class ShellCommandService {
     exitCode: number;
     error?: string;
   }> {
+
+    console.error(options);
     // Clean up previous listeners
     window.electronAPI.removeCommandListeners();
 
